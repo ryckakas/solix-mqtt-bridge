@@ -10,6 +10,8 @@ ExecStart=/usr/local/bin/solix-mqtt-bridge
 EnvironmentFile=/etc/solix-mqtt-bridge.env
 Restart=on-failure
 RestartSec=10
+# Exit code 2 means invalid configuration, which a restart cannot fix.
+RestartPreventExitStatus=2
 DynamicUser=yes
 NoNewPrivileges=yes
 ProtectSystem=strict

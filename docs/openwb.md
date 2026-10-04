@@ -99,7 +99,8 @@ reinstall after reflashing or restoring the SD card. You need shell access to op
    journalctl -u solix-mqtt-bridge -f
    ```
 
-   The unit starts the bridge at boot and restarts it after a failure. It runs as an unprivileged, sandboxed user
+   The unit starts the bridge at boot and restarts it 10 s after a crash. Invalid configuration (exit code 2) stops it
+   instead, with the problem shown in `systemctl status solix-mqtt-bridge`. It runs as an unprivileged, sandboxed user
    (`systemd-analyze security` rates it 1.4, "OK").
 
 **Run only one bridge per Solarbank.** Two instances use the same MQTT client ids, so the broker would keep
