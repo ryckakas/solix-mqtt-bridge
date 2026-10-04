@@ -1,0 +1,31 @@
+version: 2
+updates:
+  # Also bumps the bonsai-lint `tool` line, since it is a require in go.mod.
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: monthly
+    # A week lets a compromised or yanked release surface first; security updates skip it.
+    cooldown:
+      default-days: 7
+    groups:
+      go-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7

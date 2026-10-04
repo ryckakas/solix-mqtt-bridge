@@ -1,9 +1,36 @@
+# Planning artifacts and real-device backups stay local
 .plans/
 backups/
+
+# Local environment / secrets
 .env
+*.local
+
+# Build output
 /bin/
 /dist/
+/solix-openwb-bridge
 *.exe
+
+# Go test / coverage artifacts
 *.test
 *.out
+coverage.*
+
+# Go workspace files (each dev opts in locally)
+go.work
+go.work.sum
+
+# Stray logs and scratch
+*.log
+/tmp/
+
+# Editor / IDE / agent noise
+.idea/
+.vscode/
+*.swp
+.claude/worktrees/
+
+# OS noise
 .DS_Store
+Thumbs.db

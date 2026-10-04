@@ -1,0 +1,12 @@
+.git
+.github
+.claude
+.plans
+.serena
+backups
+bin
+dist
+tmp
+coverage.*
+*.md
+.env

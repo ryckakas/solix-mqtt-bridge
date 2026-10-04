@@ -1,0 +1,136 @@
+version: "2"
+
+# The default caps hide how much a newly enabled linter flags.
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+run:
+  build-tags:
+    - integration
+
+linters:
+  default: none
+  enable:
+    - bidichk
+    - bodyclose
+    - containedctx
+    - contextcheck
+    - copyloopvar
+    - depguard
+    - dupl
+    - dupword
+    - durationcheck
+    - errcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - fatcontext
+    - forcetypeassert
+    - gocheckcompilerdirectives
+    - gocritic
+    - gosec
+    - govet
+    - ineffassign
+    - intrange
+    - misspell
+    - musttag
+    - nakedret
+    - nestif
+    - nilerr
+    - nilnesserr
+    - noctx
+    - nolintlint
+    - nosprintfhostport
+    - perfsprint
+    - prealloc
+    - predeclared
+    - reassign
+    - recvcheck
+    - revive
+    - sloglint
+    - staticcheck
+    - thelper
+    - tparallel
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    - usetesting
+    - wastedassign
+
+  settings:
+    nestif:
+      min-complexity: 7
+
+    # A `default:` must not hide a new enum value: every switch handles each one explicitly.
+    exhaustive:
+      default-signifies-exhaustive: false
+
+    misspell:
+      locale: US
+
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+
+    gosec:
+      excludes:
+        - G104
+
+    # `exported` + `package-comments` enforce the API-docs rule in AGENTS.md § Comments.
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - checkPrivateReceivers
+            - sayRepetitiveInsteadOfStutters
+        - name: package-comments
+        - name: var-naming
+        - name: unused-parameter
+          arguments:
+            - allowRegex: "^_"
+        - name: redefines-builtin-id
+        - name: blank-imports
+        - name: unexported-return
+        - name: error-return
+        - name: context-as-argument
+
+    depguard:
+      rules:
+        stand-ins-test-only:
+          files:
+            - "**/cmd/solix-openwb-bridge/**"
+            - "**/internal/bridge/**"
+            - "**/internal/config/**"
+            - "**/internal/openwb/**"
+            - "**/internal/plausibility/**"
+            - "**/internal/solarbank/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/ryckakas/solix-openwb-bridge/internal/simulator
+              desc: the Modbus simulator is a test stand-in; production code must never link it
+            - pkg: github.com/ryckakas/solix-openwb-bridge/internal/openwbfake
+              desc: the fake openWB is a test stand-in; production code must never link it
+
+  exclusions:
+    rules:
+      # Noise in tests: cleanup errors, permissive fixtures, and assertions whose panic already fails the test.
+      - path: _test\.go
+        linters:
+          - containedctx
+          - dupl
+          - errcheck
+          - forcetypeassert
+          - gosec
+          - unparam
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/ryckakas/solix-openwb-bridge

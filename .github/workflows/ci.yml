@@ -1,0 +1,175 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Must stay a v2.x release: .golangci.yml uses the v2 schema.
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.14.0
+
+      # Version pinned by the `tool` line in go.mod.
+      - name: Cognitive complexity (bonsai-lint)
+        run: go tool bonsai-lint --format github .
+
+      # Version pinned by the `tool` line in go.mod; the target fails on any finding.
+      - name: Dead code (deadcode)
+        run: make deadcode
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test (race + coverage)
+        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      # Informational only; the guard keeps a failed test run from adding a confusing cover error.
+      - name: Coverage summary
+        if: always()
+        run: |
+          if [ -s coverage.out ]; then
+            go tool cover -func=coverage.out || echo "note: coverage.out had no usable data"
+          else
+            echo "note: coverage.out is empty or missing - the test step likely failed above"
+          fi
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage.out
+          if-no-files-found: warn
+
+  integration:
+    name: Integration (Docker)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Hosted runners are discarded after the job, so the reaper container adds nothing.
+      TESTCONTAINERS_RYUK_DISABLED: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Test (race + integration tag)
+        run: go test -race -tags=integration ./...
+
+  govulncheck:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Not govulncheck-action: it persists the job token and installs @latest.
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
+
+      - name: Run govulncheck
+        run: govulncheck ./...
+
+  # Online, unlike `make zizmor`: the token enables the audits that verify each SHA pin against its action's repo.
+  zizmor:
+    name: zizmor
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Image pinned by digest: Dependabot doesn't track images in `run:` steps.
+      - name: Audit GitHub Actions configuration
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          docker run --rm \
+            --env GH_TOKEN \
+            --volume "${GITHUB_WORKSPACE}:/workspace:ro" \
+            --workdir /workspace \
+            ghcr.io/zizmorcore/zizmor:1.30.1@sha256:a2eb396d886c053073405c7a980f2139ba2248ec172243cfa3841e57196e8101 \
+            --collect=all --strict-collection --format=github .
+
+  typos:
+    name: typos
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: crate-ci/typos@00f422f3b19c57bc6338715ebfe3316d38768461 # v1.50.3
+
+  image:
+    name: Container image (multi-arch, no push)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      # Cross-compiles in the build stage, so no QEMU is needed.
+      - name: Build for amd64, arm64 and arm/v7
+        run: |
+          go_version="$(sed -n 's/^toolchain go//p' go.mod)"
+          docker buildx build \
+            --platform linux/amd64,linux/arm64,linux/arm/v7 \
+            --build-arg GO_VERSION="${go_version}" \
+            .
