@@ -8,7 +8,7 @@
 Reads an Anker SOLIX Solarbank Max AC over its local Modbus TCP interface and publishes its battery data over MQTT:
 
 - **Generic MQTT output** for any consumer (Home Assistant, Node-RED, ioBroker, …).
-- **openWB 2.x output** (opt-in), feeding openWB's generic MQTT battery module.
+- **openWB output** (opt-in, openWB 2.2 or newer), feeding openWB's generic MQTT battery module.
 
 ```
 Solarbank Max AC ──Modbus TCP, FC04 only──► solix-mqtt-bridge ──MQTT──► generic topics (any consumer)
@@ -134,8 +134,9 @@ the last known values.
 
 ## openWB setup
 
-The openWB output writes to openWB's generic MQTT battery module. It works with openWB 2.x; this was checked
-against the 2.2.3 source. In openWB:
+The openWB output writes to openWB's generic MQTT battery module. It needs **openWB 2.2 or newer** and was checked
+against the 2.2.3 source. openWB 2.1 and older take MQTT battery data on different topics, so update openWB first.
+In openWB:
 
 1. *Konfiguration → Geräte und Komponenten*: add a device of vendor *Generisch*, type *MQTT*, then a component
    *Speicher*. Its component id goes into `OPENWB_BAT_ID`.
@@ -201,6 +202,10 @@ Everything is tested against local stand-ins; nothing in the test suite or the d
 
 The dev stack's broker is reachable on `127.0.0.1:18830`, e.g.
 `mosquitto_sub -p 18830 -t 'others/#' -t 'openWB/#' -v`.
+
+To watch a real Solarbank without touching anything else, `SOLARBANK_ADDR=<host>:502 make session-up` runs the
+bridge against the device with only a local broker on `127.0.0.1:18831`. It records every state document to
+`tmp/session/state.log`; stop it with `make session-down`.
 
 ## License
 

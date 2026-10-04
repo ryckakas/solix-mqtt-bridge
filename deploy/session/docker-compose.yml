@@ -1,0 +1,33 @@
+# Read-only session against the REAL Solarbank: the bridge polls it (FC04 reads only) and publishes only to the local
+# broker below; no openWB output. Start it only with the device owner's permission:
+#   SOLARBANK_ADDR=<host>:502 make session-up
+# Every state document is appended with a timestamp to tmp/session/state.log for review.
+name: solix-mqtt-bridge-session
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0.22-openssl
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    ports:
+      - "127.0.0.1:18831:1883"
+
+  bridge:
+    build:
+      context: ../..
+      args:
+        GO_VERSION: ${GO_VERSION:?run via make session-up}
+        CMD: solix-mqtt-bridge
+    environment:
+      SOLARBANK_ADDR: ${SOLARBANK_ADDR:?set SOLARBANK_ADDR to the Solarbank's host:port}
+      MQTT_URL: tcp://mosquitto:1883
+      LOG_LEVEL: debug
+    depends_on: [mosquitto]
+    restart: "no"
+
+  recorder:
+    image: eclipse-mosquitto:2.0.22-openssl
+    command: ["sh", "-c", "mosquitto_sub -h mosquitto -t 'solix-mqtt-bridge/state' -F '%I %p' >> /record/state.log"]
+    volumes:
+      - ../../tmp/session:/record
+    depends_on: [mosquitto]

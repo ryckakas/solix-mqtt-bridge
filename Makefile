@@ -13,9 +13,10 @@ LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.dat
 GOVULNCHECK_VERSION := v1.8.0
 GORELEASER_IMAGE := goreleaser/goreleaser:v2.18.2
 DEV_COMPOSE := docker compose -f deploy/dev/docker-compose.yml
+SESSION_COMPOSE := docker compose -f deploy/session/docker-compose.yml
 IMAGE ?= solix-mqtt-bridge:dev
 
-.PHONY: help fmt lint complexity deadcode readonly zizmor typos test race integration cover vuln build image dev-up dev-down dev-logs release-check check clean
+.PHONY: help fmt lint complexity deadcode readonly zizmor typos test race integration cover vuln build image dev-up dev-down dev-logs session-up session-down session-logs release-check check clean
 
 help:
 	@echo "solix-mqtt-bridge make targets:"
@@ -36,6 +37,9 @@ help:
 	@echo "  dev-up      - start the local stand-in stack (simulator, mosquitto, fake openWB, bridge)"
 	@echo "  dev-down    - stop the local stand-in stack"
 	@echo "  dev-logs    - follow the stand-in stack's logs"
+	@echo "  session-up  - read-only session against the REAL Solarbank (needs SOLARBANK_ADDR and the owner's permission)"
+	@echo "  session-down - stop the session"
+	@echo "  session-logs - follow the session's bridge logs"
 	@echo "  release-check - validate .goreleaser.yaml (via the goreleaser container)"
 	@echo "  check       - everything CI runs; green here should mean green in CI"
 	@echo "  clean       - remove build/coverage artifacts"
@@ -108,6 +112,17 @@ dev-down:
 
 dev-logs:
 	GO_VERSION=$(GO_VERSION) $(DEV_COMPOSE) logs --follow
+
+session-up:
+	@test -n "$(SOLARBANK_ADDR)" || { echo "solix-mqtt-bridge: set SOLARBANK_ADDR=<host>:502 (the REAL device; read-only)"; exit 1; }
+	@mkdir -p tmp/session
+	GO_VERSION=$(GO_VERSION) SOLARBANK_ADDR=$(SOLARBANK_ADDR) $(SESSION_COMPOSE) up --build --detach
+
+session-down:
+	GO_VERSION=$(GO_VERSION) SOLARBANK_ADDR=unused $(SESSION_COMPOSE) down
+
+session-logs:
+	GO_VERSION=$(GO_VERSION) SOLARBANK_ADDR=unused $(SESSION_COMPOSE) logs --follow bridge
 
 release-check:
 	docker run --rm -v "$(CURDIR):/src" -w /src $(GORELEASER_IMAGE) check
