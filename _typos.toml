@@ -1,4 +1,5 @@
 [default.extend-words]
 mosquitto = "mosquitto"
-# German labels from openWB's user interface, quoted verbatim in the docs.
+# German UI labels (openWB, FRITZ!Box), quoted verbatim in the docs.
 Konfiguration = "Konfiguration"
+Adresse = "Adresse"

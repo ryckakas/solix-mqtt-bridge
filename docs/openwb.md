@@ -48,65 +48,19 @@ from power itself. Enable `OPENWB_PUBLISH_COUNTERS` only if *Maximale Leistung d
 
 ## Running it on openWB
 
-openWB 2.x runs on a Raspberry Pi with a regular Linux and systemd, and the bridge is a single static binary that
-needs about 10 MB of RAM. It can therefore run on openWB itself and reach the broker on `localhost`.
+If you have shell access to your openWB (for example because you installed it on your own Raspberry Pi), the bridge
+can run on openWB itself and reach the broker on `localhost`. Follow
+[option A of the Raspberry Pi guide](raspberry-pi.md#option-a-binary-and-systemd) on openWB, with these differences:
 
-This modifies the appliance. openWB updates should leave the files below alone, but re-check after each update, and
-reinstall after reflashing or restoring the SD card. You need shell access to openWB (SSH).
+- **Binary**: `uname -m` prints `aarch64` (use `linux_arm64`) or `armv7l` (use `linux_armv7`). The `linux_armv7`
+  build runs in both cases.
+- **Configuration**: `OPENWB_MQTT_URL=tcp://localhost:1883` (and `MQTT_URL=tcp://localhost:1883` for the optional
+  generic output).
 
-1. **Pick the binary.** `uname -m` on openWB prints `aarch64` (use `linux_arm64`) or `armv7l` (use `linux_armv7`).
-   The `linux_armv7` build runs in both cases.
-2. **Download and install it** on openWB, replacing the version with the release you want:
-
-   ```sh
-   V=0.1.0 ARCH=linux_armv7
-   curl -fsSLO "https://github.com/ryckakas/solix-mqtt-bridge/releases/download/v${V}/solix-mqtt-bridge_${V}_${ARCH}.tar.gz"
-   curl -fsSLO "https://github.com/ryckakas/solix-mqtt-bridge/releases/download/v${V}/solix-mqtt-bridge_${V}_checksums.txt"
-   sha256sum --ignore-missing -c "solix-mqtt-bridge_${V}_checksums.txt"
-   tar xzf "solix-mqtt-bridge_${V}_${ARCH}.tar.gz"
-   sudo install -m 0755 solix-mqtt-bridge /usr/local/bin/solix-mqtt-bridge
-   ```
-
-   <details>
-   <summary>Building it yourself instead</summary>
-
-   Cross-compile on any machine with Go, then copy the result to openWB:
-
-   ```sh
-   CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags "-s -w" -o solix-mqtt-bridge ./cmd/solix-mqtt-bridge
-   ```
-
-   </details>
-
-3. **Check that it reads the Solarbank** from openWB: `SOLARBANK_ADDR=<solarbank-ip>:502 solix-mqtt-bridge -probe`.
-4. **Write the configuration** to `/etc/solix-mqtt-bridge.env` (readable by root only, e.g. `sudo chmod 600`):
-
-   ```sh
-   SOLARBANK_ADDR=<solarbank-ip>:502
-   OPENWB_MQTT_URL=tcp://localhost:1883
-   OPENWB_BAT_ID=<component id>
-   # Optional: the generic output on the same broker, readable with any MQTT client.
-   MQTT_URL=tcp://localhost:1883
-   MQTT_BASE_TOPIC=others/solix-mqtt-bridge
-   ```
-
-5. **Install and start the service.** Copy
-   [`solix-mqtt-bridge.service`](../deploy/examples/solix-mqtt-bridge.service) to `/etc/systemd/system/`, then:
-
-   ```sh
-   sudo systemctl daemon-reload
-   sudo systemctl enable --now solix-mqtt-bridge
-   journalctl -u solix-mqtt-bridge -f
-   ```
-
-   The unit starts the bridge at boot and restarts it 10 s after a crash. Invalid configuration (exit code 2) stops it
-   instead, with the problem shown in `systemctl status solix-mqtt-bridge`. It runs as an unprivileged, sandboxed user
-   (`systemd-analyze security` rates it 1.4, "OK").
-
-**Run only one bridge per Solarbank.** Two instances use the same MQTT client ids, so the broker would keep
-disconnecting one of them. Stop any other instance, such as a test run on a laptop, before starting this one.
-
-After an openWB update, check that it is still running: `systemctl status solix-mqtt-bridge`.
+This modifies the appliance. openWB updates should leave the installed files alone, but check
+`systemctl status solix-mqtt-bridge` after each update, and reinstall after reflashing or restoring the SD card.
+openWB-built devices usually give owners no shell access; run the bridge on a separate
+[Raspberry Pi](raspberry-pi.md) instead.
 
 <details>
 <summary>Removing it</summary>

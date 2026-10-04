@@ -52,7 +52,7 @@ This assumes the Solarbank's CT clamps sit at the grid connection, with PV, wall
      `ghcr.io/ryckakas/solix-mqtt-bridge`.
    - **Binary + systemd:** release archives contain the binary and
      [`solix-mqtt-bridge.service`](deploy/examples/solix-mqtt-bridge.service).
-   - **On openWB itself:** see [Running it on openWB](docs/openwb.md#running-it-on-openwb).
+   - **On a Raspberry Pi, step by step:** see [Running it on a Raspberry Pi](docs/raspberry-pi.md).
 
 ## Configuration
 
@@ -101,6 +101,7 @@ at different brokers. The process exits with code 2 on invalid configuration and
 | Page | Contents |
 |---|---|
 | [Generic MQTT output](docs/mqtt-output.md) | topics, the JSON state document, availability |
+| [Raspberry Pi](docs/raspberry-pi.md) | step-by-step install on a dedicated Pi, as a systemd service or with Docker |
 | [openWB](docs/openwb.md) | setup in openWB, broker access, running the bridge on openWB itself |
 | [How it works](docs/how-it-works.md) | polling, freshness, plausibility filters, the read-only guarantee |
 | [Development](docs/development.md) | make targets, local stand-ins, dev stack, releases |
