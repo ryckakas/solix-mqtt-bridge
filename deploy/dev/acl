@@ -1,0 +1,4 @@
+# The permissions openWB 2.x grants anonymous clients on its public listener.
+topic write openWB/set/#
+topic read openWB/#
+topic readwrite others/#

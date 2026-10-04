@@ -11,16 +11,19 @@ DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 
 GOVULNCHECK_VERSION := v1.8.0
-IMAGE ?= solix-openwb-bridge:dev
+GORELEASER_IMAGE := goreleaser/goreleaser:v2.18.2
+DEV_COMPOSE := docker compose -f deploy/dev/docker-compose.yml
+IMAGE ?= solix-mqtt-bridge:dev
 
-.PHONY: help fmt lint complexity deadcode zizmor typos test race integration cover vuln build image check clean
+.PHONY: help fmt lint complexity deadcode readonly zizmor typos test race integration cover vuln build image dev-up dev-down dev-logs release-check check clean
 
 help:
-	@echo "solix-openwb-bridge make targets:"
+	@echo "solix-mqtt-bridge make targets:"
 	@echo "  fmt         - golangci-lint fmt (gofumpt + goimports, auto-fix)"
 	@echo "  lint        - golangci-lint run"
 	@echo "  complexity  - bonsai-lint cognitive complexity gate"
 	@echo "  deadcode    - whole-program unreachable-function gate (incl. tests + integration tag)"
+	@echo "  readonly    - no Modbus write call outside internal/simulator"
 	@echo "  zizmor      - audit .github/ workflows and dependabot.yml (offline)"
 	@echo "  typos       - spell-check the repository"
 	@echo "  test        - go test ./..."
@@ -28,8 +31,12 @@ help:
 	@echo "  integration - race tests incl. -tags=integration (needs Docker)"
 	@echo "  cover       - race tests + coverage report (coverage.out)"
 	@echo "  vuln        - govulncheck $(GOVULNCHECK_VERSION)"
-	@echo "  build       - build ./cmd/solix-openwb-bridge into ./bin/"
+	@echo "  build       - build ./cmd/solix-mqtt-bridge into ./bin/"
 	@echo "  image       - build the container image for the local platform"
+	@echo "  dev-up      - start the local stand-in stack (simulator, mosquitto, fake openWB, bridge)"
+	@echo "  dev-down    - stop the local stand-in stack"
+	@echo "  dev-logs    - follow the stand-in stack's logs"
+	@echo "  release-check - validate .goreleaser.yaml (via the goreleaser container)"
 	@echo "  check       - everything CI runs; green here should mean green in CI"
 	@echo "  clean       - remove build/coverage artifacts"
 
@@ -37,7 +44,7 @@ help:
 
 # Usage: $(call check_tool,<binary>,<install hint>)
 define check_tool
-@command -v $(1) >/dev/null 2>&1 || { echo "solix-openwb-bridge: '$(1)' is required but not installed."; echo "  install: $(2)"; exit 1; }
+@command -v $(1) >/dev/null 2>&1 || { echo "solix-mqtt-bridge: '$(1)' is required but not installed."; echo "  install: $(2)"; exit 1; }
 endef
 
 fmt:
@@ -54,7 +61,13 @@ complexity:
 # deadcode exits 0 even with findings, so any output fails the target.
 deadcode:
 	@out="$$(go tool deadcode -test -tags=integration ./...)"; \
-	if [ -n "$$out" ]; then echo "$$out"; echo "solix-openwb-bridge: unreachable functions found"; exit 1; fi
+	if [ -n "$$out" ]; then echo "$$out"; echo "solix-mqtt-bridge: unreachable functions found"; exit 1; fi
+
+# The bridge is read-only towards the Solarbank; only the simulator (a test stand-in) may name a write call.
+MODBUS_WRITE_CALLS := \.(Write(Single|Multiple)?(Coil|Register)s?|WriteUint(16|32|64)s?|WriteFloat(32|64)s?|WriteBytes|WriteRawBytes|MaskWriteRegister|ReadWriteMultipleRegisters|WriteFileRecord)\(
+readonly:
+	@if git grep --untracked -nE '$(MODBUS_WRITE_CALLS)' -- '*.go' ':!internal/simulator/'; then \
+		echo "solix-mqtt-bridge: Modbus write call outside internal/simulator"; exit 1; fi
 
 zizmor:
 	$(call check_tool,zizmor,brew install zizmor or https://docs.zizmor.sh/installation/)
@@ -82,12 +95,24 @@ vuln:
 
 build:
 	@mkdir -p bin
-	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/solix-openwb-bridge ./cmd/solix-openwb-bridge
+	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/solix-mqtt-bridge ./cmd/solix-mqtt-bridge
 
 image:
 	docker build --build-arg GO_VERSION=$(GO_VERSION) --build-arg VERSION=$(VERSION) -t $(IMAGE) .
 
-check: lint complexity deadcode zizmor typos integration vuln
+dev-up:
+	GO_VERSION=$(GO_VERSION) $(DEV_COMPOSE) up --build --detach
+
+dev-down:
+	GO_VERSION=$(GO_VERSION) $(DEV_COMPOSE) down
+
+dev-logs:
+	GO_VERSION=$(GO_VERSION) $(DEV_COMPOSE) logs --follow
+
+release-check:
+	docker run --rm -v "$(CURDIR):/src" -w /src $(GORELEASER_IMAGE) check
+
+check: lint complexity deadcode readonly zizmor typos integration vuln
 	go vet ./...
 
 clean:

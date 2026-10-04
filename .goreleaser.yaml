@@ -1,0 +1,73 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: solix-mqtt-bridge
+
+builds:
+  - id: solix-mqtt-bridge
+    main: ./cmd/solix-mqtt-bridge
+    binary: solix-mqtt-bridge
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    goos: [linux, darwin]
+    goarch: [amd64, arm64, arm]
+    goarm: ["7"]
+    ignore:
+      - goos: darwin
+        goarch: arm
+    ldflags:
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .ShortCommit }} -X main.date={{ .Date }}
+
+archives:
+  - id: solix-mqtt-bridge
+    ids: [solix-mqtt-bridge]
+    formats: [tar.gz]
+    name_template: "solix-mqtt-bridge_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
+    files:
+      - LICENSE
+      - THIRD_PARTY_NOTICES
+      - README.md
+      - deploy/examples/*
+
+checksum:
+  name_template: "solix-mqtt-bridge_{{ .Version }}_checksums.txt"
+
+sboms:
+  - id: default
+    artifacts: archive
+
+changelog:
+  use: git
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+dockers_v2:
+  - id: solix-mqtt-bridge
+    ids: [solix-mqtt-bridge]
+    dockerfile: Dockerfile.release
+    images:
+      - "ghcr.io/ryckakas/solix-mqtt-bridge"
+    tags:
+      - "{{ .Version }}"
+      - "{{ if not .Prerelease }}latest{{ end }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+      - linux/arm/v7
+    labels:
+      "org.opencontainers.image.title": "{{ .ProjectName }}"
+      "org.opencontainers.image.description": "Anker SOLIX Solarbank to MQTT bridge (local Modbus TCP, read-only)"
+      "org.opencontainers.image.source": "https://github.com/ryckakas/solix-mqtt-bridge"
+      "org.opencontainers.image.version": "{{ .Version }}"
+      "org.opencontainers.image.created": "{{ .Date }}"
+      "org.opencontainers.image.revision": "{{ .FullCommit }}"
+      "org.opencontainers.image.licenses": "MIT"
+
+release:
+  draft: false
+  prerelease: auto

@@ -40,6 +40,9 @@ jobs:
       - name: Dead code (deadcode)
         run: make deadcode
 
+      - name: Read-only gate (no Modbus writes outside the simulator)
+        run: make readonly
+
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -153,6 +156,21 @@ jobs:
           persist-credentials: false
 
       - uses: crate-ci/typos@00f422f3b19c57bc6338715ebfe3316d38768461 # v1.50.3
+
+  goreleaser-check:
+    name: GoReleaser config
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          distribution: goreleaser
+          version: v2.18.2
+          args: check
 
   image:
     name: Container image (multi-arch, no push)

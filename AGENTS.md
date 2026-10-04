@@ -1,8 +1,13 @@
-# solix-openwb-bridge — agent rules
+# solix-mqtt-bridge: agent rules
 
-A Go service that reads an Anker SOLIX Solarbank Max AC over local Modbus TCP and publishes its battery data to an
-openWB 2.x wallbox over MQTT, so the two stop competing for PV surplus. Read `HANDOFF.md` first for goal, decisions
-and open questions.
+A Go service that reads an Anker SOLIX Solarbank Max AC over local Modbus TCP and publishes its battery data over
+MQTT. A generic core (reader, plausibility filters, fresh/stale state) feeds independent output adapters:
+- a generic MQTT output for any consumer;
+- an opt-in openWB 2.x output, which stops the wallbox and the battery competing for PV surplus (the original
+  motivation).
+
+`README.md` has the why. The approved plan, with its decision log and research evidence, lives in `.plans/`
+(local only).
 
 ## Hard rules (non-negotiable)
 
@@ -27,7 +32,7 @@ and open questions.
 ## Gates
 
 Run `make check` before considering a change done; green there should mean green in CI. It runs golangci-lint,
-bonsai-lint, deadcode, zizmor (offline), typos, race + integration tests (Docker required), govulncheck and
+bonsai-lint, deadcode, the read-only grep gate (`make readonly`), zizmor (offline), typos, race + integration tests (Docker required), govulncheck and
 `go vet`.
 
 - Never report a gate as green that you did not actually run. Fix violations in the same change; flag
@@ -40,7 +45,8 @@ bonsai-lint, deadcode, zizmor (offline), typos, race + integration tests (Docker
   - the golangci-lint `version:` in `ci.yml`;
   - the zizmor image digest;
   - the govulncheck version (Makefile + `ci.yml`);
-  - any container image tag used by tests.
+  - the goreleaser version (`ci.yml`, `release.yml`, Makefile `GORELEASER_IMAGE`);
+  - the mosquitto image tag (`internal/testbroker`, `deploy/dev/docker-compose.yml`).
 - Every `uses:` is pinned to a full commit SHA with its version in a comment. Workflows default to
   `permissions: contents: read`, raised per job, with `persist-credentials: false` on every checkout. CI runs
   zizmor online, which verifies each pin against its action's repository.
@@ -62,6 +68,9 @@ a switch or a list), pair the "why" with a named test asserting the absence, sin
 When a change makes a comment's reasoning untrue, fix or delete the comment in the same change. This applies to Go,
 YAML, shell and the Makefile alike; generated code is exempt.
 
+No em dashes (or en dashes used as dashes) in docs, the README or comments. Use a colon, a comma, parentheses or
+two sentences instead; write ranges as "0 to 100".
+
 **API docs are the other exception.** Every package and every exported identifier has a doc comment. revive's
 `exported` and `package-comments` rules enforce it, because packages are the seams the rest of the module codes
 against.
@@ -75,13 +84,18 @@ against.
 
 - **Read-only towards the Solarbank.** Production code reaches Modbus only through an interface that exposes
   FC04 input-register reads. No write function code exists outside `internal/simulator`.
-- **Sign conventions differ between the two sides; convert in exactly one place.**
-  - Solarbank register 10008: battery power, + discharging, − charging.
-  - openWB `get/power`: + charging, − discharging.
-- **openWB never expires battery data.** The bridge neutralises stale data itself: `power=0` when stale, as the
-  MQTT Last Will, and on shutdown.
-- **Test stand-ins never link into production.** `internal/simulator` and `internal/openwbfake` are reachable only
-  from tests and their own `cmd/` binaries; depguard enforces this.
+- **The device's sign convention is converted in exactly one place.** Solarbank register 10008 is + discharging,
+  − charging. `Snapshot.ChargePowerW` inverts it, and every output publishes charge-positive power (openWB's
+  `get/power` uses the same convention).
+- **Outputs are independent adapters.** Each has its own MQTT connection and its own Last Will, because one
+  connection carries only one will and the outputs need different ones. The core knows nothing about any consumer.
+- **Each output owns its stale semantics.**
+  - Generic MQTT: availability `offline` (Last Will, stale data, shutdown).
+  - openWB never expires battery data, so the openWB output neutralises it itself: `power=0` when stale, as its
+    Last Will, and on shutdown.
+- **Test stand-ins never link into production.** `internal/simulator`, `internal/openwbfake`, `internal/testbroker`
+  and `internal/testcert` are reachable only from tests and the stand-ins' own `cmd/` binaries; depguard enforces
+  this.
 
 ## Testing conventions
 

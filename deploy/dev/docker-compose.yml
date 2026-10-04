@@ -1,0 +1,46 @@
+# Local stand-ins only: a simulated Solarbank, a broker with openWB's ACL, a fake openWB and the bridge.
+# Nothing here talks to a real device.
+name: solix-mqtt-bridge-dev
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0.22-openssl
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./acl:/mosquitto/config/acl:ro
+    ports:
+      - "127.0.0.1:18830:1883"
+
+  solarbank-sim:
+    build:
+      context: ../..
+      args:
+        GO_VERSION: ${GO_VERSION:?run via make dev-up}
+        CMD: solarbank-sim
+    environment:
+      SIM_GLITCHES: "true"
+
+  openwb-fake:
+    build:
+      context: ../..
+      args:
+        GO_VERSION: ${GO_VERSION:?run via make dev-up}
+        CMD: openwb-fake
+    environment:
+      MQTT_URL: tcp://mosquitto:1883
+    depends_on: [mosquitto]
+
+  bridge:
+    build:
+      context: ../..
+      args:
+        GO_VERSION: ${GO_VERSION:?run via make dev-up}
+        CMD: solix-mqtt-bridge
+    environment:
+      SOLARBANK_ADDR: solarbank-sim:5502
+      MQTT_URL: tcp://mosquitto:1883
+      MQTT_BASE_TOPIC: others/solix-mqtt-bridge
+      OPENWB_MQTT_URL: tcp://mosquitto:1883
+      OPENWB_BAT_ID: "1"
+      LOG_LEVEL: debug
+    depends_on: [mosquitto, solarbank-sim, openwb-fake]

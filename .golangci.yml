@@ -70,6 +70,8 @@ linters:
 
     misspell:
       locale: US
+      ignore-rules:
+        - mosquitto
 
     nolintlint:
       require-explanation: true
@@ -100,19 +102,25 @@ linters:
     depguard:
       rules:
         stand-ins-test-only:
+          # Everything except tests and the stand-ins themselves, so new production packages are covered by default.
           files:
-            - "**/cmd/solix-openwb-bridge/**"
-            - "**/internal/bridge/**"
-            - "**/internal/config/**"
-            - "**/internal/openwb/**"
-            - "**/internal/plausibility/**"
-            - "**/internal/solarbank/**"
+            - "$all"
             - "!$test"
+            - "!**/internal/simulator/**"
+            - "!**/internal/openwbfake/**"
+            - "!**/internal/testbroker/**"
+            - "!**/internal/testcert/**"
+            - "!**/cmd/solarbank-sim/**"
+            - "!**/cmd/openwb-fake/**"
           deny:
-            - pkg: github.com/ryckakas/solix-openwb-bridge/internal/simulator
+            - pkg: github.com/ryckakas/solix-mqtt-bridge/internal/simulator
               desc: the Modbus simulator is a test stand-in; production code must never link it
-            - pkg: github.com/ryckakas/solix-openwb-bridge/internal/openwbfake
+            - pkg: github.com/ryckakas/solix-mqtt-bridge/internal/openwbfake
               desc: the fake openWB is a test stand-in; production code must never link it
+            - pkg: github.com/ryckakas/solix-mqtt-bridge/internal/testbroker
+              desc: test helper; production code must never link it
+            - pkg: github.com/ryckakas/solix-mqtt-bridge/internal/testcert
+              desc: test helper; production code must never link it
 
   exclusions:
     rules:
@@ -133,4 +141,4 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/ryckakas/solix-openwb-bridge
+        - github.com/ryckakas/solix-mqtt-bridge

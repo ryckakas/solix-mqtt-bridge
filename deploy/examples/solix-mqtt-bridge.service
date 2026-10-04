@@ -1,0 +1,24 @@
+# Install the binary to /usr/local/bin and the configuration to /etc/solix-mqtt-bridge.env, then:
+#   systemctl daemon-reload && systemctl enable --now solix-mqtt-bridge
+[Unit]
+Description=solix-mqtt-bridge (Anker SOLIX Solarbank to MQTT)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/solix-mqtt-bridge
+EnvironmentFile=/etc/solix-mqtt-bridge.env
+Restart=on-failure
+RestartSec=10
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+[Install]
+WantedBy=multi-user.target

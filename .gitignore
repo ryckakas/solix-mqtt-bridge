@@ -9,7 +9,7 @@ backups/
 # Build output
 /bin/
 /dist/
-/solix-openwb-bridge
+/solix-mqtt-bridge
 *.exe
 
 # Go test / coverage artifacts

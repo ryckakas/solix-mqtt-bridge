@@ -1,2 +1,4 @@
 [default.extend-words]
 mosquitto = "mosquitto"
+# German labels from openWB's user interface, quoted verbatim in the docs.
+Konfiguration = "Konfiguration"

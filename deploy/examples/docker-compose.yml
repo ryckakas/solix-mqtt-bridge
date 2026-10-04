@@ -1,0 +1,5 @@
+services:
+  solix-mqtt-bridge:
+    image: ghcr.io/ryckakas/solix-mqtt-bridge:latest
+    restart: unless-stopped
+    env_file: solix-mqtt-bridge.env
