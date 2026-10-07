@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"sync"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -54,21 +55,22 @@ type Client struct {
 }
 
 // Connect starts connecting to the broker and keeps retrying in the background; it doesn't wait for the first
-// connection. onConnect runs on its own goroutine after every successful (re)connect.
+// connection. onConnect runs on its own goroutine after every successful (re)connect. Of the failed attempts between
+// two successful connects, the first is logged as a warning with its reason and the rest at debug level.
 func Connect(cfg Config, will Will, onConnect func(), logger *slog.Logger) (*Client, error) {
 	opts, err := options(cfg, will)
 	if err != nil {
 		return nil, err
 	}
+	cl := newConnLog(cfg, logger)
 	opts.SetOnConnectHandler(func(mqtt.Client) {
-		logger.Info("mqtt connected", "broker", cfg.URL, "client_id", cfg.ClientID)
+		cl.connected()
 		if onConnect != nil {
 			onConnect()
 		}
 	})
-	opts.SetConnectionLostHandler(func(_ mqtt.Client, err error) {
-		logger.Warn("mqtt connection lost", "broker", cfg.URL, "client_id", cfg.ClientID, "err", err)
-	})
+	opts.SetConnectionLostHandler(cl.lost)
+	opts.SetConnectionNotificationHandler(cl.notify)
 	c := mqtt.NewClient(opts)
 	c.Connect()
 	return &Client{c: c, timeout: cfg.PublishTimeout}, nil
@@ -159,4 +161,47 @@ func tlsConfig(cfg Config) (*tls.Config, error) {
 	}
 	tc.RootCAs = pool
 	return tc, nil
+}
+
+// paho's own loggers are silent, so without this a broker that never answers leaves no trace at all.
+type connLog struct {
+	cfg    Config
+	logger *slog.Logger
+
+	// paho reports failures on its connect goroutine and successes on another.
+	mu      sync.Mutex
+	failing bool
+}
+
+func newConnLog(cfg Config, logger *slog.Logger) *connLog {
+	return &connLog{cfg: cfg, logger: logger}
+}
+
+// Only the first failed attempt of a streak warns, so an unreachable broker logs once rather than on every retry.
+func (l *connLog) notify(_ mqtt.Client, n mqtt.ConnectionNotification) {
+	failed, ok := n.(mqtt.ConnectionNotificationFailed)
+	if !ok {
+		return
+	}
+	l.mu.Lock()
+	first := !l.failing
+	l.failing = true
+	l.mu.Unlock()
+	level := slog.LevelDebug
+	if first {
+		level = slog.LevelWarn
+	}
+	l.logger.Log(context.Background(), level, "mqtt connect failed; retrying",
+		"broker", l.cfg.URL, "client_id", l.cfg.ClientID, "err", failed.Reason)
+}
+
+func (l *connLog) connected() {
+	l.mu.Lock()
+	l.failing = false
+	l.mu.Unlock()
+	l.logger.Info("mqtt connected", "broker", l.cfg.URL, "client_id", l.cfg.ClientID)
+}
+
+func (l *connLog) lost(_ mqtt.Client, err error) {
+	l.logger.Warn("mqtt connection lost", "broker", l.cfg.URL, "client_id", l.cfg.ClientID, "err", err)
 }

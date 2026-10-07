@@ -11,12 +11,13 @@ DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 
 GOVULNCHECK_VERSION := v1.8.0
+ACTIONLINT_VERSION := v1.7.12
 GORELEASER_IMAGE := goreleaser/goreleaser:v2.18.2
 DEV_COMPOSE := docker compose -f deploy/dev/docker-compose.yml
 SESSION_COMPOSE := docker compose -f deploy/session/docker-compose.yml
 IMAGE ?= solix-mqtt-bridge:dev
 
-.PHONY: help fmt lint complexity deadcode readonly zizmor typos test race integration cover vuln build image dev-up dev-down dev-logs session-up session-down session-logs release-check check clean
+.PHONY: help fmt lint complexity deadcode readonly tidy-check zizmor actionlint typos test race integration cover vuln build image dev-up dev-down dev-logs session-up session-down session-logs release-check check clean
 
 help:
 	@echo "solix-mqtt-bridge make targets:"
@@ -25,7 +26,9 @@ help:
 	@echo "  complexity  - bonsai-lint cognitive complexity gate"
 	@echo "  deadcode    - whole-program unreachable-function gate (incl. tests + integration tag)"
 	@echo "  readonly    - no Modbus write call outside internal/simulator"
+	@echo "  tidy-check  - go.mod/go.sum match what go mod tidy produces (changes nothing)"
 	@echo "  zizmor      - audit .github/ workflows and dependabot.yml (offline)"
+	@echo "  actionlint  - lint .github/workflows with actionlint $(ACTIONLINT_VERSION) (needs shellcheck)"
 	@echo "  typos       - spell-check the repository"
 	@echo "  test        - go test ./..."
 	@echo "  race        - go test -race ./..."
@@ -73,9 +76,17 @@ readonly:
 	@if git grep --untracked -nE '$(MODBUS_WRITE_CALLS)' -- '*.go' ':!internal/simulator/'; then \
 		echo "solix-mqtt-bridge: Modbus write call outside internal/simulator"; exit 1; fi
 
+tidy-check:
+	go mod tidy -diff
+
 zizmor:
 	$(call check_tool,zizmor,brew install zizmor or https://docs.zizmor.sh/installation/)
 	zizmor --offline --collect=all --strict-collection .
+
+# actionlint silently skips its shell-script rules when shellcheck is missing, so require it.
+actionlint:
+	$(call check_tool,shellcheck,brew install shellcheck or https://github.com/koalaman/shellcheck#installing)
+	go run github.com/rhysd/actionlint/cmd/actionlint@$(ACTIONLINT_VERSION)
 
 typos:
 	$(call check_tool,typos,brew install typos-cli or https://github.com/crate-ci/typos#install)
@@ -127,7 +138,7 @@ session-logs:
 release-check:
 	docker run --rm -v "$(CURDIR):/src" -w /src $(GORELEASER_IMAGE) check
 
-check: lint complexity deadcode readonly zizmor typos integration vuln
+check: lint complexity deadcode readonly tidy-check zizmor actionlint typos integration vuln
 	go vet ./...
 
 clean:

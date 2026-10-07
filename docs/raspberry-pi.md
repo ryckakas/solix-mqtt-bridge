@@ -148,7 +148,9 @@ as a test run on a laptop, before starting the one on the Pi.
 - **The probe fails** with a timeout or "no route to host": check that the Pi is on the same network as the Solarbank,
   that Modbus TCP is enabled in the Anker app, and that the IP address is still correct.
 - **openWB shows "Fehlende MQTT-Daten"**: check `OPENWB_BAT_ID` against the topics in the component's help text, and
-  that the Pi reaches openWB's broker: `nc -zv <openwb-ip> 1883`.
+  that the Pi reaches openWB's broker: `nc -zv <openwb-ip> 1883`. If it doesn't, the log shows
+  `mqtt connect failed; retrying` with the reason: a refused connection or a timeout, or "bad user name or password"
+  or "not Authorized" for a rejected login.
 - **The service is `failed` with exit code 2**: the configuration is invalid; `systemctl status solix-mqtt-bridge`
   lists every problem.
 - **Repeated `Solarbank read failed` warnings**: the Solarbank's Modbus server stops when the device loses its internet
