@@ -3,6 +3,10 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -70,5 +74,24 @@ func TestProbePrintsOneSnapshotAsJSON(t *testing.T) {
 	}
 	if got := dev.UnexpectedAccesses(); len(got) != 0 {
 		t.Errorf("probe sent non-FC04 requests: %v", got)
+	}
+}
+
+func TestProbeWritesNoLogFile(t *testing.T) {
+	srv, err := simulator.Listen(t.Context(), simulator.NewDevice(1, simulator.DefaultState()), "127.0.0.1:0", nil)
+	if err != nil {
+		t.Fatalf("start simulator: %v", err)
+	}
+	t.Cleanup(func() { _ = srv.Stop() })
+
+	dir := filepath.Join(t.TempDir(), "logs")
+	var stderr bytes.Buffer
+	code := run([]string{"-probe"}, env(map[string]string{"SOLARBANK_ADDR": srv.Addr(), "LOG_DIR": dir}),
+		&bytes.Buffer{}, &stderr)
+	if code != 0 {
+		t.Fatalf("exit code = %d, stderr: %s", code, stderr.String())
+	}
+	if _, err := os.Stat(dir); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("stat %s: err = %v, want the log dir never created in probe mode", dir, err)
 	}
 }

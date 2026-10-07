@@ -41,6 +41,25 @@ func TestDefaultsWithTheGenericOutput(t *testing.T) {
 	if cfg.LogLevel != slog.LevelInfo || cfg.LogJSON {
 		t.Errorf("log = %v json=%v, want info text", cfg.LogLevel, cfg.LogJSON)
 	}
+	if cfg.LogDir != "" || cfg.LogRetentionDays != 7 || cfg.LogFileLevel != slog.LevelDebug {
+		t.Errorf("log file = %q %d days %v, want off, 7 days, debug", cfg.LogDir, cfg.LogRetentionDays, cfg.LogFileLevel)
+	}
+}
+
+func TestFileLogging(t *testing.T) {
+	cfg, err := config.Load(env(map[string]string{
+		"SOLARBANK_ADDR":     "solarbank",
+		"MQTT_URL":           "tcp://broker:1883",
+		"LOG_DIR":            "/var/log/solix-mqtt-bridge",
+		"LOG_RETENTION_DAYS": "30",
+		"LOG_FILE_LEVEL":     "info",
+	}), false)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.LogDir != "/var/log/solix-mqtt-bridge" || cfg.LogRetentionDays != 30 || cfg.LogFileLevel != slog.LevelInfo {
+		t.Errorf("log file = %q %d days %v, want the configured values", cfg.LogDir, cfg.LogRetentionDays, cfg.LogFileLevel)
+	}
 }
 
 func TestOpenWBOutputOnly(t *testing.T) {
@@ -110,6 +129,10 @@ func TestRejectsInvalidValues(t *testing.T) {
 		{"SOLARBANK_ALLOW_ANY_MODEL", "maybe", "SOLARBANK_ALLOW_ANY_MODEL"},
 		{"LOG_LEVEL", "loud", "LOG_LEVEL"},
 		{"LOG_FORMAT", "xml", "LOG_FORMAT"},
+		{"LOG_RETENTION_DAYS", "0", "LOG_RETENTION_DAYS"},
+		{"LOG_RETENTION_DAYS", "366", "LOG_RETENTION_DAYS"},
+		{"LOG_RETENTION_DAYS", "week", "LOG_RETENTION_DAYS"},
+		{"LOG_FILE_LEVEL", "loud", "LOG_FILE_LEVEL"},
 		{"MQTT_BASE_TOPIC", "solix/#", "MQTT_BASE_TOPIC"},
 		{"MQTT_BASE_TOPIC", "solix/", "MQTT_BASE_TOPIC"},
 		{"OPENWB_MQTT_URL", "tcp://openwb:1883", "OPENWB_BAT_ID is required"},
