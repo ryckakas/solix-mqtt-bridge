@@ -43,7 +43,7 @@ This assumes the Solarbank's CT clamps sit at the grid connection, with PV, wall
 2. **Check that the bridge can read it.** Probe mode reads once, prints JSON and exits; it needs no MQTT:
 
    ```sh
-   SOLARBANK_ADDR=192.0.2.10 solix-mqtt-bridge -probe
+   SOLARBANK_ADDR=<solarbank-ip> solix-mqtt-bridge -probe
    ```
 
 3. **Run it** with at least one output configured:
@@ -59,10 +59,10 @@ This assumes the Solarbank's CT clamps sit at the grid connection, with PV, wall
 All settings are environment variables; no device or broker address has a default. A typical setup:
 
 ```sh
-SOLARBANK_ADDR=192.0.2.10                    # the Solarbank (port 502 if omitted)
-MQTT_URL=tcp://192.0.2.20:1883               # generic output, any broker
-OPENWB_MQTT_URL=tcp://192.0.2.30:1883        # openWB output (optional)
-OPENWB_BAT_ID=5                              # openWB's MQTT battery component id
+SOLARBANK_ADDR=<solarbank-ip>                # the Solarbank (port 502 if omitted)
+MQTT_URL=tcp://<broker-ip>:1883              # generic output, any broker
+OPENWB_MQTT_URL=tcp://<openwb-ip>:1883       # openWB output (optional)
+OPENWB_BAT_ID=<component id>                 # openWB's MQTT battery component id
 ```
 
 <details>
