@@ -11,7 +11,9 @@ MQTT. A generic core (reader, plausibility filters, fresh/stale state) feeds ind
 
 ## Hard rules (non-negotiable)
 
-- **Plan first.** No code before an approved plan (use the planning skill; plans live in `.plans/`, gitignored).
+- **Plan first for behaviour changes.** Features and changes to how the bridge reads, filters, publishes or logs need
+  an approved plan before code (use the planning skill; plans live in `.plans/`, gitignored). Small, well-scoped
+  changes (a CI gate, a Makefile target, config, docs) go straight to implementation. If the size is unclear, ask.
 - **Isolated testing only.** Develop and test against local stand-ins: the in-process Modbus simulator, a mosquitto
   container, the fake openWB. Never connect to the real openWB or the real Anker device, even though both are
   reachable on the network.
@@ -32,7 +34,8 @@ MQTT. A generic core (reader, plausibility filters, fresh/stale state) feeds ind
 ## Gates
 
 Run `make check` before considering a change done; green there should mean green in CI. It runs golangci-lint,
-bonsai-lint, deadcode, the read-only grep gate (`make readonly`), zizmor (offline), typos, race + integration tests (Docker required), govulncheck and
+bonsai-lint, deadcode, the read-only grep gate (`make readonly`), the go mod tidy drift check (`make tidy-check`),
+zizmor (offline), actionlint (with shellcheck), typos, race + integration tests (Docker required), govulncheck and
 `go vet`.
 
 - Never report a gate as green that you did not actually run. Fix violations in the same change; flag
@@ -45,6 +48,8 @@ bonsai-lint, deadcode, the read-only grep gate (`make readonly`), zizmor (offlin
   - the golangci-lint `version:` in `ci.yml`;
   - the zizmor image digest;
   - the govulncheck version (Makefile + `ci.yml`);
+  - the actionlint version (Makefile `ACTIONLINT_VERSION`);
+  - the ShellCheck version and its SHA-256 (`ci.yml`, actionlint job);
   - the goreleaser version (`ci.yml`, `release.yml`, Makefile `GORELEASER_IMAGE`);
   - the mosquitto image tag (`internal/testbroker`, `deploy/dev/docker-compose.yml`).
 - Every `uses:` is pinned to a full commit SHA with its version in a comment. Workflows default to
