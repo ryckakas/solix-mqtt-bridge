@@ -88,6 +88,49 @@ func TestZeroPowerAcceptedWhenStatusIsNotActive(t *testing.T) {
 	}
 }
 
+func TestZeroPowerHoldsOnlyAValueThatAgreesWithTheStatus(t *testing.T) {
+	tests := []struct {
+		name        string
+		firstStatus solarbank.BatteryStatus
+		firstPowerW int32
+		zeroStatus  solarbank.BatteryStatus
+		wantPowerW  int64
+		wantHeld    bool
+	}{
+		{"charging, held", solarbank.StatusCharging, -1000, solarbank.StatusCharging, 1000, true},
+		{"discharging, held", solarbank.StatusDischarging, 100, solarbank.StatusDischarging, -100, true},
+		{"turning to charging", solarbank.StatusDischarging, 320, solarbank.StatusCharging, 0, false},
+		{"turning to discharging", solarbank.StatusCharging, -390, solarbank.StatusDischarging, 0, false},
+		{"from zero to charging", solarbank.StatusStandby, 0, solarbank.StatusCharging, 0, false},
+		{"from zero to discharging", solarbank.StatusStandby, 0, solarbank.StatusDischarging, 0, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := defaultFilter()
+			f.Apply(snap(0, func(s *solarbank.Snapshot) { s.Status, s.BatteryPowerW = tt.firstStatus, tt.firstPowerW }))
+			r := f.Apply(snap(5, func(s *solarbank.Snapshot) { s.Status, s.BatteryPowerW = tt.zeroStatus, 0 }))
+			if r.ChargePowerW != tt.wantPowerW {
+				t.Errorf("power = %d, want %d", r.ChargePowerW, tt.wantPowerW)
+			}
+			if got := rejected(r, plausibility.ZeroPower); got != tt.wantHeld {
+				t.Errorf("zero-power rejected = %v, want %v", got, tt.wantHeld)
+			}
+		})
+	}
+}
+
+func TestZeroPowerStretchIsHeldOnlyAtItsStart(t *testing.T) {
+	f := defaultFilter()
+	f.Apply(snap(0, nil))
+	zero := func(s *solarbank.Snapshot) { s.BatteryPowerW = 0 }
+	for i := 1; i <= 10; i++ {
+		f.Apply(snap(5*i, zero))
+	}
+	if got := f.Counts()[plausibility.ZeroPower]; got != 2 {
+		t.Errorf("zero-power count after 10 zero polls = %d, want 2", got)
+	}
+}
+
 func TestSoCChangeWithinPhysicsIsAccepted(t *testing.T) {
 	f := defaultFilter()
 	f.Apply(snap(0, withSoC(50)))

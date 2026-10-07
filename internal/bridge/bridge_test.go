@@ -1,7 +1,9 @@
 package bridge
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -207,6 +209,39 @@ func TestRunClosesOutputsAndSourceOnCancel(t *testing.T) {
 	}
 	if !out.closed || src.closes != 1 {
 		t.Errorf("closed output %v, source closes %d; want true and 1", out.closed, src.closes)
+	}
+}
+
+func TestEveryGoodReadLogsAPollLine(t *testing.T) {
+	b, src, _, clock := setup()
+	var logs bytes.Buffer
+	b.logger = slog.New(slog.NewJSONHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	mustPoll(t, b)
+	src.readErr = errors.New("connection reset")
+	*clock = t0.Add(5 * time.Second)
+	mustPoll(t, b)
+
+	var polls []map[string]any
+	for line := range bytes.Lines(logs.Bytes()) {
+		var rec map[string]any
+		if err := json.Unmarshal(line, &rec); err != nil {
+			t.Fatalf("log line %q: %v", line, err)
+		}
+		if rec["msg"] == "poll" {
+			polls = append(polls, rec)
+		}
+	}
+	if len(polls) != 1 {
+		t.Fatalf("poll lines = %d, want 1 (one good read, one failed)", len(polls))
+	}
+	want := map[string]any{
+		"status": "charging", "raw_battery_power_w": -1500.0, "charge_power_w": 1500.0,
+		"raw_soc_percent": 63.0, "soc_percent": 63.0, "pv_power_w": 0.0, "home_load_w": 0.0, "grid_power_w": 0.0,
+	}
+	for k, v := range want {
+		if polls[0][k] != v {
+			t.Errorf("poll %s = %v, want %v", k, polls[0][k], v)
+		}
 	}
 }
 

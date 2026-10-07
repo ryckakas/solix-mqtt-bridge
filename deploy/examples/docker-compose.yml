@@ -3,3 +3,6 @@ services:
     image: ghcr.io/ryckakas/solix-mqtt-bridge:latest
     restart: unless-stopped
     env_file: solix-mqtt-bridge.env
+    # For LOG_DIR=/logs. The container runs as uid 65532: mkdir logs && sudo chown 65532:65532 logs
+    # volumes:
+    #   - ./logs:/logs

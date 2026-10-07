@@ -28,6 +28,12 @@ make dev-down
 
 The broker is reachable on `127.0.0.1:18830`, e.g. `mosquitto_sub -p 18830 -t 'others/#' -t 'openWB/#' -v`.
 
+## Log files
+
+`LOG_DIR=tmp/logs` on a local run writes daily files with a line per poll (`msg=poll`: raw and filtered battery
+power, state of charge, PV, home load and grid). Keep `LOG_LEVEL=info` so the terminal stays quiet; the files default
+to `debug`. `tmp/` is gitignored.
+
 ## Watching a real Solarbank
 
 `SOLARBANK_ADDR=<host>:502 make session-up` runs the bridge against the real device with only a local broker on

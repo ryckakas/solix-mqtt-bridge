@@ -31,7 +31,7 @@ Each filter guards against a firmware glitch reported for this device:
 
 | Filter | Glitch | Handling |
 |---|---|---|
-| `zero-power` | battery power reads exactly 0 W for one poll while the status says charging or discharging | keep the last power for up to 2 polls |
+| `zero-power` | battery power reads exactly 0 W for one poll while the status says charging or discharging | keep the last power for up to 2 polls if it points the way the status says; at a start or a direction change the status moves first, so 0 W passes through |
 | `soc-jump` | state of charge jumps further than the battery could (e.g. 16 % → 85 % for minutes) | keep the last value; accept the new level once it has persisted for `SOC_JUMP_CONFIRM` (default 10 min) |
 | `soc-range` | state of charge above 100 % | keep the last value |
 | `charged-total`, `discharged-total` | lifetime totals read 0 or run backwards (e.g. during a firmware update) | keep the last accepted value |

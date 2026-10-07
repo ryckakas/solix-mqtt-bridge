@@ -115,6 +115,10 @@ func (b *Bridge) read(ctx context.Context) error {
 		b.logger.Info("Solarbank reads recovered")
 	}
 	reading := b.filter.Apply(snap)
+	b.logger.Debug("poll", "status", snap.Status.String(),
+		"raw_battery_power_w", snap.BatteryPowerW, "charge_power_w", reading.ChargePowerW,
+		"raw_soc_percent", snap.SoCPercent, "soc_percent", reading.SoCPercent,
+		"pv_power_w", snap.PVPowerW, "home_load_w", snap.HomeLoadW, "grid_power_w", snap.GridPowerW)
 	b.logRejections(ctx, reading, snap.Status)
 	b.state.Raw, b.state.Reading, b.state.LastGoodRead = snap, reading, snap.At
 	b.state.FilterCounts = b.filter.Counts()

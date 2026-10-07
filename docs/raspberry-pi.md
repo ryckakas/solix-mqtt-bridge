@@ -97,6 +97,10 @@ Then install the bridge with **option A** (simplest) or **option B** (if the Pi 
 systemd starts the bridge at boot and restarts it 10 s after a crash. Invalid configuration stops it instead, with the
 problem shown in `systemctl status solix-mqtt-bridge`. It runs as an unprivileged, sandboxed user.
 
+**Optional log files:** add `LOG_DIR=/var/log/solix-mqtt-bridge` to the configuration and restart the service. The
+bridge then writes one file per day there, including a line per poll, and deletes files older than a week
+(`LOG_RETENTION_DAYS`). `sudo ls /var/log/solix-mqtt-bridge` lists them.
+
 ## Option B: Docker
 
 1. **Install Docker Engine and the Compose plugin** following Docker's official installation guide for Debian;
@@ -120,6 +124,11 @@ problem shown in `systemctl status solix-mqtt-bridge`. It runs as an unprivilege
    ```
 
 The container restarts automatically, also after a reboot of the Pi.
+
+**Optional log files:** create the directory for the container's user with
+`mkdir logs && sudo chown 65532:65532 logs`, uncomment the `volumes` lines in `docker-compose.yml`, add
+`LOG_DIR=/logs` to `solix-mqtt-bridge.env`, then `docker compose up -d`. The files appear in `~/solix-mqtt-bridge/logs`.
+If the directory isn't writable, the bridge keeps running and says so in `docker compose logs`.
 
 ## Updating
 

@@ -89,7 +89,10 @@ OPENWB_BAT_ID=5                              # openWB's MQTT battery component i
 | `OPENWB_MQTT_CLIENT_ID` | `solix-mqtt-bridge-openwb` | client id of the openWB output |
 | `OPENWB_MQTT_USERNAME`, `OPENWB_MQTT_PASSWORD`, `OPENWB_MQTT_CA_FILE`, `OPENWB_MQTT_TLS_INSECURE` | none | as above, for openWB's broker |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
-| `LOG_FORMAT` | `text` | `text` or `json` |
+| `LOG_FORMAT` | `text` | `text` or `json`, for the console and the log files |
+| `LOG_DIR` | none | enables **file logging**: one file per day in this directory, created if missing |
+| `LOG_RETENTION_DAYS` | `7` | full days of log files kept before today's (1 to 365); older files are deleted |
+| `LOG_FILE_LEVEL` | `debug` | minimum level in the log files; `debug` adds one line per poll with raw and filtered values |
 
 At least one of `MQTT_URL` and `OPENWB_MQTT_URL` is required. Each output has its own connection, so they can point
 at different brokers. The process exits with code 2 on invalid configuration and lists every problem.

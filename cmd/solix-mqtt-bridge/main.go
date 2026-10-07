@@ -19,6 +19,7 @@ import (
 
 	"github.com/ryckakas/solix-mqtt-bridge/internal/bridge"
 	"github.com/ryckakas/solix-mqtt-bridge/internal/config"
+	"github.com/ryckakas/solix-mqtt-bridge/internal/logfile"
 	"github.com/ryckakas/solix-mqtt-bridge/internal/mqttout"
 	"github.com/ryckakas/solix-mqtt-bridge/internal/openwb"
 	"github.com/ryckakas/solix-mqtt-bridge/internal/solarbank"
@@ -51,7 +52,8 @@ func run(args []string, lookup config.LookupFunc, stdout, stderr io.Writer) int 
 		_, _ = fmt.Fprintf(stderr, "solix-mqtt-bridge: invalid configuration:\n%v\n", err)
 		return 2
 	}
-	logger := newLogger(cfg, stderr)
+	logger, closeLog := newLogger(cfg, stderr, !*probe)
+	defer closeLog()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -150,10 +152,25 @@ func probeOnce(ctx context.Context, r *solarbank.Reader, stdout io.Writer, logge
 	return 0
 }
 
-func newLogger(cfg config.Config, w io.Writer) *slog.Logger {
-	opts := &slog.HandlerOptions{Level: cfg.LogLevel}
-	if cfg.LogJSON {
-		return slog.New(slog.NewJSONHandler(w, opts))
+func newLogger(cfg config.Config, console io.Writer, toFile bool) (*slog.Logger, func()) {
+	consoleHandler := newHandler(cfg, console, cfg.LogLevel)
+	consoleLogger := slog.New(consoleHandler)
+	if cfg.LogDir == "" || !toFile {
+		return consoleLogger, func() {}
 	}
-	return slog.New(slog.NewTextHandler(w, opts))
+	file := logfile.New(cfg.LogDir, cfg.LogRetentionDays, time.Now, consoleLogger)
+	logger := slog.New(slog.NewMultiHandler(consoleHandler, newHandler(cfg, file, cfg.LogFileLevel)))
+	return logger, func() {
+		if err := file.Close(); err != nil {
+			consoleLogger.Warn("closing the log file failed", "err", err)
+		}
+	}
+}
+
+func newHandler(cfg config.Config, w io.Writer, level slog.Level) slog.Handler {
+	opts := &slog.HandlerOptions{Level: level}
+	if cfg.LogJSON {
+		return slog.NewJSONHandler(w, opts)
+	}
+	return slog.NewTextHandler(w, opts)
 }

@@ -14,7 +14,8 @@ import (
 type Name string
 
 const (
-	// ZeroPower replaces a 0 W reading while the status says charging or discharging.
+	// ZeroPower replaces a 0 W reading while the status says the battery still moves power in the direction of the
+	// last reading.
 	ZeroPower Name = "zero-power"
 	// SoCJump holds the last state of charge when a reading moves further than the battery could have.
 	SoCJump Name = "soc-jump"
@@ -108,8 +109,7 @@ func (f *Filter) Counts() map[Name]uint64 {
 
 func (f *Filter) filterPower(s solarbank.Snapshot, r *Reading) int64 {
 	raw := s.ChargePowerW()
-	active := s.Status == solarbank.StatusCharging || s.Status == solarbank.StatusDischarging
-	if raw == 0 && active && f.power.ok && f.heldPolls < f.cfg.ZeroPowerHoldPolls {
+	if raw == 0 && f.power.ok && agrees(s.Status, f.power.value) && f.heldPolls < f.cfg.ZeroPowerHoldPolls {
 		f.heldPolls++
 		r.Rejections = append(r.Rejections, Rejection{Filter: ZeroPower, Raw: raw, Kept: f.power.value})
 		return f.power.value
@@ -117,6 +117,12 @@ func (f *Filter) filterPower(s solarbank.Snapshot, r *Reading) int64 {
 	f.heldPolls = 0
 	f.power = sample[int64]{value: raw, at: s.At, ok: true}
 	return raw
+}
+
+// Status changes a poll before power follows, so a held value pointing the other way (or 0) would be stale.
+func agrees(status solarbank.BatteryStatus, chargePowerW int64) bool {
+	return (status == solarbank.StatusCharging && chargePowerW > 0) ||
+		(status == solarbank.StatusDischarging && chargePowerW < 0)
 }
 
 func (f *Filter) filterCounter(name Name, last *sample[uint64], raw uint64, at time.Time, r *Reading) {

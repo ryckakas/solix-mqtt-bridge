@@ -42,8 +42,14 @@ type Config struct {
 	OpenWB *openwb.Config
 	// LogLevel is the minimum level logged.
 	LogLevel slog.Level
-	// LogJSON selects JSON log lines instead of text.
+	// LogJSON selects JSON log lines instead of text, on the console and in the log files.
 	LogJSON bool
+	// LogDir is the directory for daily log files; empty disables file logging.
+	LogDir string
+	// LogRetentionDays is how many full days of log files are kept before today's, 1 to 365.
+	LogRetentionDays int
+	// LogFileLevel is the minimum level written to the log files; the default debug includes one line per poll.
+	LogFileLevel slog.Level
 }
 
 type reader struct {
@@ -68,10 +74,13 @@ func Load(lookup LookupFunc, probe bool) (Config, error) {
 			SoCJumpConfirm:     r.duration("SOC_JUMP_CONFIRM", 10*time.Minute),
 			ZeroPowerHoldPolls: zeroPowerHoldPolls,
 		},
-		Generic:  r.generic(),
-		OpenWB:   r.openWB(),
-		LogLevel: r.logLevel(),
-		LogJSON:  r.logJSON(),
+		Generic:          r.generic(),
+		OpenWB:           r.openWB(),
+		LogLevel:         r.logLevel("LOG_LEVEL", "info"),
+		LogJSON:          r.logJSON(),
+		LogDir:           r.str("LOG_DIR", ""),
+		LogRetentionDays: r.retentionDays("LOG_RETENTION_DAYS", 7),
+		LogFileLevel:     r.logLevel("LOG_FILE_LEVEL", "debug"),
 	}
 	if cfg.StaleAfter <= cfg.PollInterval {
 		r.fail("STALE_AFTER (%s) must be longer than POLL_INTERVAL (%s)", cfg.StaleAfter, cfg.PollInterval)
@@ -142,11 +151,11 @@ func (r *reader) mqtt(prefix, defaultClientID string) (mqttclient.Config, bool) 
 	}, true
 }
 
-func (r *reader) logLevel() slog.Level {
+func (r *reader) logLevel(key, fallback string) slog.Level {
 	var level slog.Level
-	raw := r.str("LOG_LEVEL", "info")
+	raw := r.str(key, fallback)
 	if err := level.UnmarshalText([]byte(raw)); err != nil {
-		r.fail("LOG_LEVEL %q: must be debug, info, warn or error", raw)
+		r.fail("%s %q: must be debug, info, warn or error", key, raw)
 	}
 	return level
 }
@@ -207,6 +216,19 @@ func (r *reader) unitID(key string, fallback uint8) uint8 {
 		return fallback
 	}
 	return uint8(n)
+}
+
+func (r *reader) retentionDays(key string, fallback int) int {
+	raw, ok := r.lookup(key)
+	if !ok || raw == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 1 || n > 365 {
+		r.fail("%s %q: must be a number of days between 1 and 365", key, raw)
+		return fallback
+	}
+	return n
 }
 
 func (r *reader) fail(format string, args ...any) {
