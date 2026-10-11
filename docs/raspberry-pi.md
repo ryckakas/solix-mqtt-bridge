@@ -47,9 +47,10 @@ Then install the bridge with **option A** (simplest) or **option B** (if the Pi 
 
 ## Option A: binary and systemd
 
-1. **Download and install the release** (replace the version with the release you want):
+1. **Download and install the release** into its own directory (replace the version with the release you want):
 
    ```sh
+   mkdir -p ~/solix-mqtt-bridge && cd ~/solix-mqtt-bridge
    V=0.1.0 ARCH=linux_arm64
    curl -fsSLO "https://github.com/ryckakas/solix-mqtt-bridge/releases/download/v${V}/solix-mqtt-bridge_${V}_${ARCH}.tar.gz"
    curl -fsSLO "https://github.com/ryckakas/solix-mqtt-bridge/releases/download/v${V}/solix-mqtt-bridge_${V}_checksums.txt"
@@ -82,9 +83,10 @@ Then install the bridge with **option A** (simplest) or **option B** (if the Pi 
 
    All settings are listed in the [README](../README.md#configuration).
 
-4. **Install and start the service.** The unit file is in the release archive you just extracted:
+4. **Install and start the service.** The unit file is in the release archive you extracted in step 1:
 
    ```sh
+   cd ~/solix-mqtt-bridge
    sudo install -m 0644 deploy/examples/solix-mqtt-bridge.service /etc/systemd/system/
    sudo systemctl daemon-reload
    sudo systemctl enable --now solix-mqtt-bridge
@@ -105,12 +107,11 @@ bridge then writes one file per day there, including a line per poll, and delete
 
 1. **Install Docker Engine and the Compose plugin** following Docker's official installation guide for Debian;
    Raspberry Pi OS (64-bit) uses its arm64 packages.
-2. **Create a directory with the example files** from the release archive (download it as in option A, step 1):
+2. **Copy the example files** out of the release archive (download and extract it as in option A, step 1):
 
    ```sh
-   mkdir -p ~/solix-mqtt-bridge
-   cp deploy/examples/docker-compose.yml deploy/examples/solix-mqtt-bridge.env ~/solix-mqtt-bridge/
    cd ~/solix-mqtt-bridge
+   cp deploy/examples/docker-compose.yml deploy/examples/solix-mqtt-bridge.env .
    ```
 
 3. **Edit `solix-mqtt-bridge.env`** with the same values as in option A, step 3. In `docker-compose.yml`, pin the
