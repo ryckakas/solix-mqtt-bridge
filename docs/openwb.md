@@ -50,12 +50,9 @@ from power itself. Enable `OPENWB_PUBLISH_COUNTERS` only if *Maximale Leistung d
 
 If you have shell access to your openWB (for example because you installed it on your own Raspberry Pi), the bridge
 can run on openWB itself and reach the broker on `localhost`. Follow
-[option A of the Raspberry Pi guide](raspberry-pi.md#option-a-binary-and-systemd) on openWB, with these differences:
-
-- **Binary**: `uname -m` prints `aarch64` (use `linux_arm64`) or `armv7l` (use `linux_armv7`). The `linux_armv7`
-  build runs in both cases.
-- **Configuration**: `OPENWB_MQTT_URL=tcp://localhost:1883` (and `MQTT_URL=tcp://localhost:1883` for the optional
-  generic output).
+[option A of the Raspberry Pi guide](raspberry-pi.md#option-a-binary-and-systemd) on openWB. The installer picks the
+build that matches openWB's system. The only difference is the configuration: `OPENWB_MQTT_URL=tcp://localhost:1883`
+(and `MQTT_URL=tcp://localhost:1883` for the optional generic output).
 
 This modifies the appliance. openWB updates should leave the installed files alone, but check
 `systemctl status solix-mqtt-bridge` after each update, and reinstall after reflashing or restoring the SD card.

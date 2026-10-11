@@ -1,8 +1,8 @@
 # Development
 
 ```sh
-make check        # every gate CI runs: lint, complexity, dead code, read-only, tidy, zizmor, actionlint, typos, tests, govulncheck
-make integration  # tests including the Docker-based ones (mosquitto via testcontainers)
+make check        # every gate CI runs: lint, complexity, dead code, read-only, tidy, zizmor, actionlint, shellcheck, typos, tests, govulncheck
+make integration  # tests including the Docker-based ones (mosquitto and the installer via testcontainers)
 make build        # ./bin/solix-mqtt-bridge for this machine
 make help         # all targets
 ```
@@ -43,5 +43,6 @@ to `debug`. `tmp/` is gitignored.
 ## Releases
 
 Pushing a `v*` tag runs the release workflow: goreleaser builds binaries for Linux (amd64, arm64, armv7) and macOS,
-archives with an SBOM, and multi-arch images at `ghcr.io/ryckakas/solix-mqtt-bridge`. `make release-check` validates
-the goreleaser configuration locally.
+archives with an SBOM, and multi-arch images at `ghcr.io/ryckakas/solix-mqtt-bridge`. It also publishes the installer,
+`scripts/install.sh`, and lists it in the checksums. A smoke test then installs the new release with its own installer
+in a Debian container. `make release-check` validates the goreleaser configuration locally.

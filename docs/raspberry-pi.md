@@ -47,19 +47,17 @@ Then install the bridge with **option A** (simplest) or **option B** (if the Pi 
 
 ## Option A: binary and systemd
 
-1. **Download and install the release** into its own directory (replace the version with the release you want):
+1. **Install the bridge** with the installer from the latest release:
 
    ```sh
-   mkdir -p ~/solix-mqtt-bridge && cd ~/solix-mqtt-bridge
-   V=0.1.0 ARCH=linux_arm64
-   curl -fsSLO "https://github.com/ryckakas/solix-mqtt-bridge/releases/download/v${V}/solix-mqtt-bridge_${V}_${ARCH}.tar.gz"
-   curl -fsSLO "https://github.com/ryckakas/solix-mqtt-bridge/releases/download/v${V}/solix-mqtt-bridge_${V}_checksums.txt"
-   sha256sum --ignore-missing -c "solix-mqtt-bridge_${V}_checksums.txt"
-   tar xzf "solix-mqtt-bridge_${V}_${ARCH}.tar.gz"
-   sudo install -m 0755 solix-mqtt-bridge /usr/local/bin/solix-mqtt-bridge
+   curl -fsSL https://github.com/ryckakas/solix-mqtt-bridge/releases/latest/download/install.sh | sudo sh
    ```
 
-   The checksum line must print `OK`.
+   It picks the build for your Pi, checks it against the release's checksums, and installs the binary to
+   `/usr/local/bin`, the systemd service, and a configuration template at `/etc/solix-mqtt-bridge.env` that only root
+   can read. It doesn't start the bridge yet, and leaves no downloads behind. To install a specific release instead,
+   add its version: `... | sudo sh -s -- 0.2.3`. From another computer, run the same line through
+   `ssh -t <user>@<pi-ip> '...'`.
 
 2. **Check that the Pi can read the Solarbank.** This reads once and prints JSON; compare state of charge and power
    with the Anker app:
@@ -68,8 +66,8 @@ Then install the bridge with **option A** (simplest) or **option B** (if the Pi 
    SOLARBANK_ADDR=<solarbank-ip>:502 solix-mqtt-bridge -probe
    ```
 
-3. **Write the configuration** to `/etc/solix-mqtt-bridge.env`, e.g. with `sudo nano /etc/solix-mqtt-bridge.env`, then
-   `sudo chmod 600 /etc/solix-mqtt-bridge.env`:
+3. **Fill in the configuration** with `sudo nano /etc/solix-mqtt-bridge.env`. Replace every placeholder, or comment
+   out the lines you don't use. For the openWB output, for example:
 
    ```sh
    SOLARBANK_ADDR=<solarbank-ip>:502
@@ -83,12 +81,9 @@ Then install the bridge with **option A** (simplest) or **option B** (if the Pi 
 
    All settings are listed in the [README](../README.md#configuration).
 
-4. **Install and start the service.** The unit file is in the release archive you extracted in step 1:
+4. **Start the service**, now and at every boot, and watch it connect:
 
    ```sh
-   cd ~/solix-mqtt-bridge
-   sudo install -m 0644 deploy/examples/solix-mqtt-bridge.service /etc/systemd/system/
-   sudo systemctl daemon-reload
    sudo systemctl enable --now solix-mqtt-bridge
    journalctl -u solix-mqtt-bridge -f
    ```
@@ -99,6 +94,43 @@ Then install the bridge with **option A** (simplest) or **option B** (if the Pi 
 systemd starts the bridge at boot and restarts it 10 s after a crash. Invalid configuration stops it instead, with the
 problem shown in `systemctl status solix-mqtt-bridge`. It runs as an unprivileged, sandboxed user.
 
+<details>
+<summary>Reading the installer before running it</summary>
+
+The installer is a plain shell script. Its SHA-256 is listed in the release's checksums file.
+
+```sh
+curl -fsSLO https://github.com/ryckakas/solix-mqtt-bridge/releases/latest/download/install.sh
+less install.sh
+sudo sh install.sh
+```
+
+</details>
+
+<details>
+<summary>Installing without the script</summary>
+
+Download and extract the release into its own directory (replace the version and, on a 32-bit system, the
+architecture), then install the files by hand:
+
+```sh
+mkdir -p ~/solix-mqtt-bridge && cd ~/solix-mqtt-bridge
+V=0.2.3 ARCH=linux_arm64
+curl -fsSLO "https://github.com/ryckakas/solix-mqtt-bridge/releases/download/v${V}/solix-mqtt-bridge_${V}_${ARCH}.tar.gz"
+curl -fsSLO "https://github.com/ryckakas/solix-mqtt-bridge/releases/download/v${V}/solix-mqtt-bridge_${V}_checksums.txt"
+sha256sum --ignore-missing -c "solix-mqtt-bridge_${V}_checksums.txt"
+tar xzf "solix-mqtt-bridge_${V}_${ARCH}.tar.gz"
+sudo install -m 0755 solix-mqtt-bridge /usr/local/bin/solix-mqtt-bridge
+sudo install -m 0644 deploy/examples/solix-mqtt-bridge.service /etc/systemd/system/
+sudo install -m 0600 deploy/examples/solix-mqtt-bridge.env /etc/solix-mqtt-bridge.env
+sudo systemctl daemon-reload
+```
+
+The checksum line must print `OK`. Skip the `.env` line when updating, so your configuration stays. Then continue
+with step 2.
+
+</details>
+
 **Optional log files:** add `LOG_DIR=/var/log/solix-mqtt-bridge` to the configuration and restart the service. The
 bridge then writes one file per day there, including a line per poll, and deletes files older than a week
 (`LOG_RETENTION_DAYS`). `sudo ls /var/log/solix-mqtt-bridge` lists them.
@@ -107,7 +139,8 @@ bridge then writes one file per day there, including a line per poll, and delete
 
 1. **Install Docker Engine and the Compose plugin** following Docker's official installation guide for Debian;
    Raspberry Pi OS (64-bit) uses its arm64 packages.
-2. **Copy the example files** out of the release archive (download and extract it as in option A, step 1):
+2. **Copy the example files** out of the release archive (download and extract it as in option A,
+   *Installing without the script*, up to the `tar` line):
 
    ```sh
    cd ~/solix-mqtt-bridge
@@ -133,7 +166,9 @@ If the directory isn't writable, the bridge keeps running and says so in `docker
 
 ## Updating
 
-- **Option A**: repeat step 1 with the new version, then `sudo systemctl restart solix-mqtt-bridge`.
+- **Option A**: run the installer from step 1 again. It installs the new binary, and the service file if it changed,
+  keeps your configuration, and restarts the bridge if it's enabled. When nothing changed it leaves the bridge alone.
+  To go back to an older release, run it with that version: `... | sudo sh -s -- 0.2.2`.
 - **Option B**: change the image tag in `docker-compose.yml`, then `docker compose pull && docker compose up -d`.
 
 Check the log afterwards; `solix-mqtt-bridge starting` shows the running version.

@@ -1,0 +1,53 @@
+#!/bin/sh
+# Test stand-in for systemctl in containers without systemd: records every call and keeps the unit's state in files.
+set -eu
+
+state=/var/lib/systemctl-shim
+mkdir -p "$state"
+echo "$*" >>"$state/calls"
+
+verb=
+now=false
+quiet=false
+for arg in "$@"; do
+	case $arg in
+	-q | --quiet) quiet=true ;;
+	--now) now=true ;;
+	-*) ;;
+	*) [ -n "$verb" ] || verb=$arg ;;
+	esac
+done
+
+say() {
+	$quiet || echo "$1"
+}
+
+started() {
+	cat "$state/start-result" 2>/dev/null || echo active
+}
+
+case $verb in
+is-active)
+	current=$(cat "$state/active" 2>/dev/null || echo inactive)
+	say "$current"
+	[ "$current" = active ] || exit 3
+	;;
+is-enabled)
+	if [ -e "$state/enabled" ]; then
+		say enabled
+	else
+		say disabled
+		exit 1
+	fi
+	;;
+enable)
+	touch "$state/enabled"
+	if $now; then started >"$state/active"; fi
+	;;
+disable)
+	rm -f "$state/enabled"
+	if $now; then echo inactive >"$state/active"; fi
+	;;
+start | restart) started >"$state/active" ;;
+stop) echo inactive >"$state/active" ;;
+esac

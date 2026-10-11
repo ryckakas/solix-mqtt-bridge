@@ -17,7 +17,7 @@ DEV_COMPOSE := docker compose -f deploy/dev/docker-compose.yml
 SESSION_COMPOSE := docker compose -f deploy/session/docker-compose.yml
 IMAGE ?= solix-mqtt-bridge:dev
 
-.PHONY: help fmt lint complexity deadcode readonly tidy-check zizmor actionlint typos test race integration cover vuln build image dev-up dev-down dev-logs session-up session-down session-logs release-check check clean
+.PHONY: help fmt lint complexity deadcode readonly tidy-check zizmor actionlint shellcheck typos test race integration cover vuln build image dev-up dev-down dev-logs session-up session-down session-logs release-check check clean
 
 help:
 	@echo "solix-mqtt-bridge make targets:"
@@ -29,6 +29,7 @@ help:
 	@echo "  tidy-check  - go.mod/go.sum match what go mod tidy produces (changes nothing)"
 	@echo "  zizmor      - audit .github/ workflows and dependabot.yml (offline)"
 	@echo "  actionlint  - lint .github/workflows with actionlint $(ACTIONLINT_VERSION) (needs shellcheck)"
+	@echo "  shellcheck  - lint the installer and its test stand-ins"
 	@echo "  typos       - spell-check the repository"
 	@echo "  test        - go test ./..."
 	@echo "  race        - go test -race ./..."
@@ -88,6 +89,10 @@ actionlint:
 	$(call check_tool,shellcheck,brew install shellcheck or https://github.com/koalaman/shellcheck#installing)
 	go run github.com/rhysd/actionlint/cmd/actionlint@$(ACTIONLINT_VERSION)
 
+shellcheck:
+	$(call check_tool,shellcheck,brew install shellcheck or https://github.com/koalaman/shellcheck#installing)
+	shellcheck scripts/*.sh scripts/testdata/*/*
+
 typos:
 	$(call check_tool,typos,brew install typos-cli or https://github.com/crate-ci/typos#install)
 	typos
@@ -138,7 +143,7 @@ session-logs:
 release-check:
 	docker run --rm -v "$(CURDIR):/src" -w /src $(GORELEASER_IMAGE) check
 
-check: lint complexity deadcode readonly tidy-check zizmor actionlint typos integration vuln
+check: lint complexity deadcode readonly tidy-check zizmor actionlint shellcheck typos integration vuln
 	go vet ./...
 
 clean:
