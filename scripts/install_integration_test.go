@@ -33,6 +33,9 @@ const (
 	configPath = "/etc/solix-mqtt-bridge.env"
 	shimState  = "/var/lib/systemctl-shim"
 
+	serviceUser = "solix-mqtt-bridge"
+	logDir      = "/var/log/solix-mqtt-bridge"
+
 	latest   = "9.9.9"
 	previous = "9.9.8"
 	badSum   = "9.9.7"
@@ -51,9 +54,11 @@ func TestFreshInstallLeavesTheServiceDisabledAndStopped(t *testing.T) {
 	p := startPi(t)
 	out := succeeds(t)(p.install(t, shimPath, "", latest))
 	assertSteps(t, out, "solix-mqtt-bridge installer", "Checking the system", "Finding the release: "+latest,
-		"Downloading", "Verifying the checksum: OK", "Installing the binary", "Service file: installed",
-		"Configuration: created")
+		"Downloading", "Verifying the checksum: OK", "Installing the binary", "Service user: created "+serviceUser,
+		"Service file: installed", "Configuration: created")
 	assertContains(t, out, "sudo systemctl enable --now solix-mqtt-bridge")
+	assertContains(t, out, "sudo usermod -aG "+serviceUser+" ")
+	p.assertSystemUser(t)
 	if strings.Contains(out, "\x1b[") {
 		t.Errorf("output has ANSI escape codes although stdout isn't a terminal:\n%q", out)
 	}
@@ -90,7 +95,8 @@ func TestUpdateRestartsAnEnabledServiceAndReplacesAChangedUnit(t *testing.T) {
 	p.must(t, "echo '# local edit' >> "+unitPath)
 	out := succeeds(t)(p.install(t, shimPath, "", latest))
 	assertSteps(t, out, "solix-mqtt-bridge installer", "Checking the system", "Finding the release: "+latest,
-		"Downloading", "Verifying the checksum: OK", "Installing the binary", "Service file: replaced",
+		"Downloading", "Verifying the checksum: OK", "Installing the binary", "Service user: "+serviceUser,
+		"Service file: updated to this release's version",
 		"Configuration: "+configPath+" kept", "Restarting solix-mqtt-bridge", "Waiting for the service: running")
 	assertContains(t, out, previous+" -> "+latest)
 	assertContains(t, out, "sudo systemctl edit solix-mqtt-bridge")
@@ -126,6 +132,46 @@ func TestFailedRestartShowsTheLogAndHowToRollBack(t *testing.T) {
 	assertContains(t, out, "Waiting for the service: failed")
 	assertContains(t, out, "shim journal line 3")
 	assertContains(t, out, "sudo sh -s -- "+previous)
+}
+
+func TestSudoUserJoinsTheLogGroupOnce(t *testing.T) {
+	t.Parallel()
+	p := startPi(t)
+	p.must(t, "useradd --create-home pi")
+	out := succeeds(t)(p.installAs(t, "pi", previous))
+	assertContains(t, out, "added pi to group "+serviceUser)
+	assertContains(t, out, "log in again")
+	if strings.Contains(out, "usermod") {
+		t.Errorf("output suggests usermod although pi was added:\n%s", out)
+	}
+	if groups := p.must(t, "id -nG pi"); !slices.Contains(strings.Fields(groups), serviceUser) {
+		t.Errorf("groups of pi = %q, want %s among them", groups, serviceUser)
+	}
+
+	out = succeeds(t)(p.installAs(t, "pi", latest))
+	if strings.Contains(out, "added pi") {
+		t.Errorf("second run adds pi again:\n%s", out)
+	}
+}
+
+func TestExistingGroupWithoutTheUserIsReused(t *testing.T) {
+	t.Parallel()
+	p := startPi(t)
+	p.must(t, "groupadd --system "+serviceUser)
+	succeeds(t)(p.install(t, shimPath, "", latest))
+	p.assertSystemUser(t)
+}
+
+func TestUpdateMakesOlderLogFilesGroupReadable(t *testing.T) {
+	t.Parallel()
+	p := startPi(t)
+	p.configured(t, previous)
+	old := logDir + "/solix-mqtt-bridge-2026-10-01.log"
+	p.must(t, "mkdir -p "+logDir+" && echo old > "+old+" && chmod 0600 "+old)
+	assertContains(t, succeeds(t)(p.install(t, shimPath, "", latest)), "Log files:")
+	if got := strings.TrimSpace(p.must(t, "stat -c %a "+old)); got != "640" {
+		t.Errorf("mode of %s = %s, want 640", old, got)
+	}
 }
 
 func TestChecksumMismatchChangesNothing(t *testing.T) {
@@ -250,9 +296,20 @@ func (p *pi) must(t *testing.T, script string) string {
 // temporary files behind.
 func (p *pi) install(t *testing.T, path, user string, args ...string) (int, string) {
 	t.Helper()
+	return p.installer(t, path, user, "", args...)
+}
+
+// installAs runs the installer as root on behalf of sudoUser, the way sudo sets SUDO_USER.
+func (p *pi) installAs(t *testing.T, sudoUser string, args ...string) (int, string) {
+	t.Helper()
+	return p.installer(t, shimPath, "", "SUDO_USER="+sudoUser+" ", args...)
+}
+
+func (p *pi) installer(t *testing.T, path, user, env string, args ...string) (int, string) {
+	t.Helper()
 	before := p.must(t, "ls -A /tmp")
 	code, out := p.exec(t, path, user,
-		`curl -fsSL "$SOLIX_RELEASES_URL/latest/download/install.sh" | sh -s -- `+strings.Join(args, " "))
+		`curl -fsSL "$SOLIX_RELEASES_URL/latest/download/install.sh" | `+env+`sh -s -- `+strings.Join(args, " "))
 	if after := p.must(t, "ls -A /tmp"); after != before {
 		t.Errorf("/tmp after the run = %q, want %q (no leftovers)", after, before)
 	}
@@ -279,6 +336,24 @@ func (p *pi) changes(t *testing.T) []string {
 		}
 	}
 	return got
+}
+
+// assertSystemUser checks the service account: a system user without login, in its own group.
+func (p *pi) assertSystemUser(t *testing.T) {
+	t.Helper()
+	fields := strings.Split(strings.TrimSpace(p.must(t, "getent passwd "+serviceUser)), ":")
+	if len(fields) != 7 {
+		t.Fatalf("getent passwd %s = %q", serviceUser, fields)
+	}
+	if uid, _ := strconv.Atoi(fields[2]); uid == 0 || uid >= 1000 {
+		t.Errorf("uid = %d, want a system uid (1 to 999)", uid)
+	}
+	if fields[6] != "/usr/sbin/nologin" {
+		t.Errorf("shell = %q, want /usr/sbin/nologin", fields[6])
+	}
+	if group := strings.TrimSpace(p.must(t, "id -gn "+serviceUser)); group != serviceUser {
+		t.Errorf("primary group = %q, want %s", group, serviceUser)
+	}
 }
 
 func (p *pi) assertVersion(t *testing.T, version string) {

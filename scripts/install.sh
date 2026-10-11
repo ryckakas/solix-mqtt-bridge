@@ -44,7 +44,7 @@ x86_64 | amd64) arch=linux_amd64 ;;
 esac
 [ -d /run/systemd/system ] || fail "systemd is not running; this installer sets up a systemd service"
 missing=''
-for tool in curl tar sha256sum install cmp mktemp systemctl journalctl; do
+for tool in curl tar sha256sum install cmp mktemp find getent id useradd usermod systemctl journalctl; do
 	command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
 done
 [ -z "$missing" ] || fail "missing tools:$missing"
@@ -115,6 +115,27 @@ else
 fi
 install -m 0755 "$tmp/$name" "$bin"
 
+add_user() {
+	useradd --system "$@" --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin "$name"
+}
+if getent passwd "$name" >/dev/null; then
+	step "Service user: $name"
+else
+	if getent group "$name" >/dev/null; then add_user --gid "$name"; else add_user --user-group; fi
+	step "Service user: created $name"
+fi
+
+# Whoever ran sudo is the one who wants to read the logs.
+sudo_user=${SUDO_USER:-}
+if [ -n "$sudo_user" ] && [ "$sudo_user" != root ]; then
+	if ! id -nG "$sudo_user" | tr ' ' '\n' | grep -qx "$name"; then
+		usermod -aG "$name" "$sudo_user"
+		step "Log access: added $sudo_user to group $name (log in again to read the logs without sudo)"
+	fi
+elif [ -z "$(getent group "$name" | cut -d : -f 4)" ]; then
+	warn "To read the log files without sudo, add your user to the group: sudo usermod -aG $name <user>"
+fi
+
 reload=true
 if [ ! -e "$unit" ]; then
 	install -m 0644 "$tmp/$new_unit" "$unit"
@@ -124,8 +145,8 @@ elif cmp -s "$tmp/$new_unit" "$unit"; then
 	step "Service file: unchanged"
 else
 	install -m 0644 "$tmp/$new_unit" "$unit"
-	step "Service file: replaced (it differed from the release's copy)"
-	warn "Local changes to the service belong in a drop-in: sudo systemctl edit $name"
+	step "Service file: updated to this release's version"
+	warn "Updates replace edits to the service file; keep your own settings in: sudo systemctl edit $name"
 fi
 if $reload; then systemctl daemon-reload; fi
 
@@ -156,6 +177,15 @@ sleep 5
 state=$(systemctl is-active "$name" || true)
 if [ "$state" = active ]; then
 	printf '%srunning%s\n' "$green" "$reset"
+	# Files from versions before the service group existed are 0600; systemd has just handed them to the new user.
+	log_dir=/var/log/$name
+	if [ -d "$log_dir" ] && [ ! -L "$log_dir" ]; then
+		old_logs=$(find "$log_dir" -maxdepth 1 -name "$name-*.log" ! -perm -g=r | wc -l)
+		if [ "$old_logs" -gt 0 ]; then
+			find "$log_dir" -maxdepth 1 -name "$name-*.log" ! -perm -g=r -exec chmod 0640 {} +
+			step "Log files: $old_logs older files made readable for group $name"
+		fi
+	fi
 	printf 'Done: %s %s is running. Follow the log with: journalctl -u %s -f\n' "$name" "$version" "$name"
 	exit 0
 fi

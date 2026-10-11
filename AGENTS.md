@@ -36,7 +36,8 @@ MQTT. A generic core (reader, plausibility filters, fresh/stale state) feeds ind
 Run `make check` before considering a change done; green there should mean green in CI. It runs golangci-lint,
 bonsai-lint, deadcode, the read-only grep gate (`make readonly`), the go mod tidy drift check (`make tidy-check`),
 zizmor (offline), actionlint (with shellcheck), shellcheck on `scripts/` (the installer and its test stand-ins),
-typos, race + integration tests (Docker required), govulncheck and `go vet`.
+`systemd-analyze verify` and `security` on the service file (`make unit-check`, in Debian), typos, race +
+integration tests (Docker required), govulncheck and `go vet`.
 
 - Never report a gate as green that you did not actually run. Fix violations in the same change; flag
   pre-existing ones instead of silently widening a change.
@@ -52,10 +53,14 @@ typos, race + integration tests (Docker required), govulncheck and `go vet`.
   - the ShellCheck version and its SHA-256 (`ci.yml`, actionlint job);
   - the goreleaser version (`ci.yml`, `release.yml`, Makefile `GORELEASER_IMAGE`);
   - the mosquitto image tag (`internal/testbroker`, `deploy/dev/docker-compose.yml`);
-  - the `buildpack-deps:trixie-curl` digest (`scripts/install_integration_test.go`, `release.yml` smoke job).
+  - the `buildpack-deps:trixie-curl` digest (`scripts/install_integration_test.go`, `release.yml` smoke job);
+  - the `debian:trixie` digest (Makefile `UNIT_IMAGE`). The systemd it installs comes from Debian's archive and is
+    the one tool not pinned exactly.
 - Every `uses:` is pinned to a full commit SHA with its version in a comment. Workflows default to
   `permissions: contents: read`, raised per job, with `persist-credentials: false` on every checkout. CI runs
   zizmor online, which verifies each pin against its action's repository.
+- `make unit-check` holds the unit's `systemd-analyze security` exposure at its current score (`threshold` in
+  `scripts/check-unit.sh`, in tenths). Lower it when hardening improves; never raise it to make a change pass.
 - bonsai-lint gates cognitive complexity at 15 with no baseline. Restructure rather than suppress. The only
   suppression is `// bonsai-lint-ignore: <reason>` above the declaration.
 - deadcode runs whole-program (`-test -tags=integration`) and fails on any unreachable function. It catches the

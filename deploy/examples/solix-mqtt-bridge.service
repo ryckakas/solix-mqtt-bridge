@@ -1,4 +1,5 @@
-# Install the binary to /usr/local/bin and the configuration to /etc/solix-mqtt-bridge.env, then:
+# scripts/install.sh sets this up. By hand: create the user (see docs/raspberry-pi.md), install the binary to
+# /usr/local/bin and the configuration to /etc/solix-mqtt-bridge.env, then:
 #   systemctl daemon-reload && systemctl enable --now solix-mqtt-bridge
 [Unit]
 Description=solix-mqtt-bridge (Anker SOLIX Solarbank to MQTT)
@@ -12,13 +13,17 @@ Restart=on-failure
 RestartSec=10
 # Exit code 2 means invalid configuration, which a restart cannot fix.
 RestartPreventExitStatus=2
-DynamicUser=yes
+# A fixed user rather than DynamicUser, which would keep the logs in root-only /var/log/private.
+User=solix-mqtt-bridge
+Group=solix-mqtt-bridge
+RemoveIPC=yes
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
-# The only writable place, for the optional LOG_DIR=/var/log/solix-mqtt-bridge.
+# The only writable place, for the optional LOG_DIR=/var/log/solix-mqtt-bridge; members of the group read it.
 LogsDirectory=solix-mqtt-bridge
+LogsDirectoryMode=0750
 PrivateDevices=yes
 RestrictAddressFamilies=AF_INET AF_INET6
 LockPersonality=yes
@@ -40,7 +45,7 @@ RestrictSUIDSGID=yes
 SystemCallArchitectures=native
 SystemCallFilter=@system-service
 SystemCallFilter=~@privileged @resources
-UMask=0077
+UMask=0027
 
 [Install]
 WantedBy=multi-user.target

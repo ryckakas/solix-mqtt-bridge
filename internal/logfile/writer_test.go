@@ -94,7 +94,7 @@ func TestCreatesTheDirAndAppendsAcrossRestarts(t *testing.T) {
 	if got := contents(t, path); got != "one\ntwo\n" {
 		t.Errorf("file = %q, want both lines appended", got)
 	}
-	for p, want := range map[string]fs.FileMode{dir: 0o700, path: 0o600} {
+	for p, want := range map[string]fs.FileMode{dir: 0o750, path: 0o640} {
 		info, err := os.Stat(p)
 		if err != nil {
 			t.Fatalf("stat %s: %v", p, err)
@@ -102,6 +102,28 @@ func TestCreatesTheDirAndAppendsAcrossRestarts(t *testing.T) {
 		if got := info.Mode().Perm(); got != want {
 			t.Errorf("%s: mode = %v, want %v", p, got, want)
 		}
+	}
+}
+
+func TestMakesAFileFromAnOlderVersionGroupReadable(t *testing.T) {
+	dir := t.TempDir()
+	c := at(7, 12, 0)
+	path := filepath.Join(dir, fileName(c.t))
+	if err := os.WriteFile(path, []byte("old\n"), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	w, _ := open(t, dir, c)
+	write(t, w, "new")
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o640 {
+		t.Errorf("mode = %v, want 0640", got)
+	}
+	if got := contents(t, path); got != "old\nnew\n" {
+		t.Errorf("file = %q, want the new line appended", got)
 	}
 }
 

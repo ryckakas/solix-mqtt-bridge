@@ -13,11 +13,13 @@ LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.dat
 GOVULNCHECK_VERSION := v1.8.0
 ACTIONLINT_VERSION := v1.7.12
 GORELEASER_IMAGE := goreleaser/goreleaser:v2.18.2
+# systemd itself comes from Debian's archive for this release, so its exact version isn't pinned.
+UNIT_IMAGE := debian:trixie@sha256:913f6706df59a68922d1dd08f78c2476560a8d367897200a6005b00e5f67c2d5
 DEV_COMPOSE := docker compose -f deploy/dev/docker-compose.yml
 SESSION_COMPOSE := docker compose -f deploy/session/docker-compose.yml
 IMAGE ?= solix-mqtt-bridge:dev
 
-.PHONY: help fmt lint complexity deadcode readonly tidy-check zizmor actionlint shellcheck typos test race integration cover vuln build image dev-up dev-down dev-logs session-up session-down session-logs release-check check clean
+.PHONY: help fmt lint complexity deadcode readonly tidy-check zizmor actionlint shellcheck unit-check typos test race integration cover vuln build image dev-up dev-down dev-logs session-up session-down session-logs release-check check clean
 
 help:
 	@echo "solix-mqtt-bridge make targets:"
@@ -30,6 +32,7 @@ help:
 	@echo "  zizmor      - audit .github/ workflows and dependabot.yml (offline)"
 	@echo "  actionlint  - lint .github/workflows with actionlint $(ACTIONLINT_VERSION) (needs shellcheck)"
 	@echo "  shellcheck  - lint the installer and its test stand-ins"
+	@echo "  unit-check  - systemd-analyze verify + security on the service file (Docker)"
 	@echo "  typos       - spell-check the repository"
 	@echo "  test        - go test ./..."
 	@echo "  race        - go test -race ./..."
@@ -93,6 +96,9 @@ shellcheck:
 	$(call check_tool,shellcheck,brew install shellcheck or https://github.com/koalaman/shellcheck#installing)
 	shellcheck scripts/*.sh scripts/testdata/*/*
 
+unit-check:
+	docker run --rm -e DEBIAN_FRONTEND=noninteractive -v "$(CURDIR):/src:ro" -w /src $(UNIT_IMAGE) sh scripts/check-unit.sh
+
 typos:
 	$(call check_tool,typos,brew install typos-cli or https://github.com/crate-ci/typos#install)
 	typos
@@ -143,7 +149,7 @@ session-logs:
 release-check:
 	docker run --rm -v "$(CURDIR):/src" -w /src $(GORELEASER_IMAGE) check
 
-check: lint complexity deadcode readonly tidy-check zizmor actionlint shellcheck typos integration vuln
+check: lint complexity deadcode readonly tidy-check zizmor actionlint shellcheck unit-check typos integration vuln
 	go vet ./...
 
 clean:
