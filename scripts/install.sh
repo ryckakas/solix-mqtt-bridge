@@ -162,6 +162,19 @@ if $first_install; then
 fi
 step "Configuration: $config kept as it is"
 
+# Logs from before the service user are 0600, in DynamicUser's folder. On systemd 257 that folder belongs to nobody
+# and systemd leaves it so, mapping it into the service only, out of the group's reach. Owned by the user, it stays so.
+log_dir=/var/log/$name
+if [ -L "$log_dir" ]; then log_dir=/var/log/private/$name; fi
+if [ -d "$log_dir" ] && [ ! -L "$log_dir" ]; then
+	stale=$(find "$log_dir" \( ! -user "$name" -o ! -group "$name" -o -name "$name-*.log" ! -perm -g=r \) -print -quit)
+	if [ -n "$stale" ]; then
+		chown -R "$name:$name" "$log_dir"
+		find "$log_dir" -maxdepth 1 -name "$name-*.log" ! -perm -g=r -exec chmod 0640 {} +
+		step "Log files: handed to $name, readable for its group"
+	fi
+fi
+
 # An enabled unit is meant to run, so a failed one is restarted too: the update may be its fix.
 if ! systemctl is-enabled --quiet "$name" && ! systemctl is-active --quiet "$name"; then
 	step "Service: not enabled, left stopped"
@@ -177,15 +190,6 @@ sleep 5
 state=$(systemctl is-active "$name" || true)
 if [ "$state" = active ]; then
 	printf '%srunning%s\n' "$green" "$reset"
-	# Files from versions before the service group existed are 0600; systemd has just handed them to the new user.
-	log_dir=/var/log/$name
-	if [ -d "$log_dir" ] && [ ! -L "$log_dir" ]; then
-		old_logs=$(find "$log_dir" -maxdepth 1 -name "$name-*.log" ! -perm -g=r | wc -l)
-		if [ "$old_logs" -gt 0 ]; then
-			find "$log_dir" -maxdepth 1 -name "$name-*.log" ! -perm -g=r -exec chmod 0640 {} +
-			step "Log files: $old_logs older files made readable for group $name"
-		fi
-	fi
 	printf 'Done: %s %s is running. Follow the log with: journalctl -u %s -f\n' "$name" "$version" "$name"
 	exit 0
 fi

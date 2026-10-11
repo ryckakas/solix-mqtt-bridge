@@ -134,6 +134,16 @@ The checksum line must print `OK`. When updating, skip the `.env` line so your c
 and `usermod` lines are needed once; after that `useradd` only reports that the user exists. Then continue with
 step 2.
 
+If the log files still need sudo after updating from 0.2.x (Debian 13 leaves the old log folder owned by `nobody`),
+hand them to the service user once:
+
+```sh
+sudo systemctl stop solix-mqtt-bridge
+sudo chown -R solix-mqtt-bridge:solix-mqtt-bridge /var/log/solix-mqtt-bridge/
+sudo chmod -R g+r /var/log/solix-mqtt-bridge/
+sudo systemctl start solix-mqtt-bridge
+```
+
 </details>
 
 **Optional log files:** add `LOG_DIR=/var/log/solix-mqtt-bridge` to the configuration and restart the service. The

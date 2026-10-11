@@ -162,15 +162,63 @@ func TestExistingGroupWithoutTheUserIsReused(t *testing.T) {
 	p.assertSystemUser(t)
 }
 
-func TestUpdateMakesOlderLogFilesGroupReadable(t *testing.T) {
+// Versions before the service user left 0600 files in a folder of DynamicUser's. systemd 257 keeps such a folder owned
+// by nobody, even once DynamicUser is off, and only maps it into the service, so the group couldn't read it.
+func TestUpdateHandsOlderLogsToTheServiceUser(t *testing.T) {
 	t.Parallel()
+	const private = "/var/log/private/solix-mqtt-bridge"
+	for name, c := range map[string]oldLogs{
+		"private folder, systemd 257":         {dir: private, owner: "65534:65534", mode: "600"},
+		"private folder, older systemd":       {dir: private, owner: "61184:61184", mode: "600"},
+		"folder systemd 257 moved back":       {dir: logDir, owner: "65534:65534", mode: "640"},
+		"private folder of a stopped service": {dir: private, owner: "65534:65534", mode: "600", stopped: true},
+		"folder already handed over":          {dir: logDir, owner: serviceUser + ":" + serviceUser, mode: "640", done: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			c.assertHandedOver(t)
+		})
+	}
+}
+
+// oldLogs is a log folder with one file, as an earlier version and systemd left it.
+type oldLogs struct {
+	dir, owner, mode string
+	stopped, done    bool
+}
+
+func (c oldLogs) assertHandedOver(t *testing.T) {
+	t.Helper()
 	p := startPi(t)
 	p.configured(t, previous)
-	old := logDir + "/solix-mqtt-bridge-2026-10-01.log"
-	p.must(t, "mkdir -p "+logDir+" && echo old > "+old+" && chmod 0600 "+old)
-	assertContains(t, succeeds(t)(p.install(t, shimPath, "", latest)), "Log files:")
-	if got := strings.TrimSpace(p.must(t, "stat -c %a "+old)); got != "640" {
-		t.Errorf("mode of %s = %s, want 640", old, got)
+	file := c.dir + "/solix-mqtt-bridge-2026-10-01.log"
+	setup := "mkdir -p " + c.dir + " && echo old > " + file + " && chmod " + c.mode + " " + file +
+		" && chown -R " + c.owner + " " + c.dir
+	if c.dir != logDir {
+		setup += " && ln -s private/solix-mqtt-bridge " + logDir
+	}
+	if c.stopped {
+		setup += " && systemctl disable --now solix-mqtt-bridge"
+	}
+	p.must(t, setup)
+
+	out := succeeds(t)(p.install(t, shimPath, "", latest))
+	step := strings.Index(out, "==> Log files: ")
+	switch {
+	case c.done && step >= 0:
+		t.Errorf("output reports a change to logs that were already handed over:\n%s", out)
+	case !c.done && step < 0:
+		t.Errorf("output lacks the Log files step:\n%s", out)
+	case !c.stopped && step > strings.Index(out, "==> Restarting"):
+		t.Errorf("logs handed over after the restart, too late for systemd:\n%s", out)
+	}
+	for _, path := range []string{c.dir, file} {
+		if got := strings.TrimSpace(p.must(t, "stat -c %U:%G "+path)); got != serviceUser+":"+serviceUser {
+			t.Errorf("owner of %s = %s, want %s:%s", path, got, serviceUser, serviceUser)
+		}
+	}
+	if got := strings.TrimSpace(p.must(t, "stat -c %a "+file)); got != "640" {
+		t.Errorf("mode of %s = %s, want 640", file, got)
 	}
 }
 
