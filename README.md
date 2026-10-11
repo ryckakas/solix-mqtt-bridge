@@ -50,8 +50,9 @@ This assumes the Solarbank's CT clamps sit at the grid connection, with PV, wall
    - **Docker:** [`deploy/examples/docker-compose.yml`](deploy/examples/docker-compose.yml) with
      [`solix-mqtt-bridge.env`](deploy/examples/solix-mqtt-bridge.env); images for amd64, arm64 and arm/v7 are at
      `ghcr.io/ryckakas/solix-mqtt-bridge`.
-   - **Binary + systemd:** release archives contain the binary and
-     [`solix-mqtt-bridge.service`](deploy/examples/solix-mqtt-bridge.service).
+   - **Binary + systemd:** `curl -fsSL https://github.com/ryckakas/solix-mqtt-bridge/releases/latest/download/install.sh | sudo sh`
+     installs the binary and [`solix-mqtt-bridge.service`](deploy/examples/solix-mqtt-bridge.service), and updates
+     them when run again.
    - **On a Raspberry Pi, step by step:** see [Running it on a Raspberry Pi](docs/raspberry-pi.md).
 
 ## Configuration

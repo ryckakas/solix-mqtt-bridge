@@ -35,8 +35,8 @@ MQTT. A generic core (reader, plausibility filters, fresh/stale state) feeds ind
 
 Run `make check` before considering a change done; green there should mean green in CI. It runs golangci-lint,
 bonsai-lint, deadcode, the read-only grep gate (`make readonly`), the go mod tidy drift check (`make tidy-check`),
-zizmor (offline), actionlint (with shellcheck), typos, race + integration tests (Docker required), govulncheck and
-`go vet`.
+zizmor (offline), actionlint (with shellcheck), shellcheck on `scripts/` (the installer and its test stand-ins),
+typos, race + integration tests (Docker required), govulncheck and `go vet`.
 
 - Never report a gate as green that you did not actually run. Fix violations in the same change; flag
   pre-existing ones instead of silently widening a change.
@@ -51,7 +51,8 @@ zizmor (offline), actionlint (with shellcheck), typos, race + integration tests 
   - the actionlint version (Makefile `ACTIONLINT_VERSION`);
   - the ShellCheck version and its SHA-256 (`ci.yml`, actionlint job);
   - the goreleaser version (`ci.yml`, `release.yml`, Makefile `GORELEASER_IMAGE`);
-  - the mosquitto image tag (`internal/testbroker`, `deploy/dev/docker-compose.yml`).
+  - the mosquitto image tag (`internal/testbroker`, `deploy/dev/docker-compose.yml`);
+  - the `buildpack-deps:trixie-curl` digest (`scripts/install_integration_test.go`, `release.yml` smoke job).
 - Every `uses:` is pinned to a full commit SHA with its version in a comment. Workflows default to
   `permissions: contents: read`, raised per job, with `persist-credentials: false` on every checkout. CI runs
   zizmor online, which verifies each pin against its action's repository.

@@ -1,0 +1,7 @@
+#!/bin/sh
+# Test stand-in for a board without a release build (Raspberry Pi Zero and 1).
+if [ "${1:-}" = -m ]; then
+	echo armv6l
+else
+	exec /usr/bin/uname "$@"
+fi

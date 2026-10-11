@@ -177,7 +177,7 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      # Pinned and checksummed, unlike the runner's own: actionlint runs it on every `run:` script.
+      # Pinned and checksummed, unlike the runner's own: it lints every `run:` script and the installer.
       - name: Install ShellCheck
         env:
           SHELLCHECK_VERSION: v0.11.0
@@ -194,6 +194,9 @@ jobs:
       # Version pinned by ACTIONLINT_VERSION in the Makefile.
       - name: Lint workflows
         run: make actionlint
+
+      - name: Lint shell scripts
+        run: make shellcheck
 
   typos:
     name: typos

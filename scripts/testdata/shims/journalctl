@@ -1,0 +1,7 @@
+#!/bin/sh
+# Test stand-in for journalctl: records the call and prints a recognisable log tail.
+set -eu
+
+mkdir -p /var/lib/systemctl-shim
+echo "$*" >>/var/lib/systemctl-shim/journalctl-calls
+printf 'shim journal line %s\n' 1 2 3

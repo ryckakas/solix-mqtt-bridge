@@ -55,3 +55,43 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Catches drift between .goreleaser.yaml's archive names and scripts/install.sh, against the real release.
+  installer-smoke:
+    name: Installer smoke test
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Checksums list install.sh and every Linux archive
+        env:
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          v="${TAG#v}"
+          base="https://github.com/${REPO}/releases/download/${TAG}"
+          curl -fsSLo "${RUNNER_TEMP}/sums.txt" "${base}/solix-mqtt-bridge_${v}_checksums.txt"
+          for f in install.sh "solix-mqtt-bridge_${v}_linux_amd64.tar.gz" \
+            "solix-mqtt-bridge_${v}_linux_arm64.tar.gz" "solix-mqtt-bridge_${v}_linux_armv7.tar.gz"; do
+            grep -q "  ${f}\$" "${RUNNER_TEMP}/sums.txt" || { echo "::error::${f} is missing from the checksums"; exit 1; }
+          done
+          curl -fsSLo "${RUNNER_TEMP}/install.sh" "${base}/install.sh"
+          (cd "${RUNNER_TEMP}" && grep "  install.sh\$" sums.txt | sha256sum -c -)
+
+      # Same image as scripts/install_integration_test.go: Debian trixie with curl, the base of Raspberry Pi OS.
+      - name: Install the release with its own installer
+        env:
+          TAG: ${{ github.ref_name }}
+          IMAGE: buildpack-deps:trixie-curl@sha256:3dd78c060b4d7c97b426d0160f7d8876c84fbf2fc36e651e9c75620ac9a7da24
+        run: |
+          docker run --rm -e TAG -v "${PWD}/scripts/testdata/shims:/opt/shims:ro" -v "${RUNNER_TEMP}/install.sh:/opt/install.sh:ro" \
+            "${IMAGE}" sh -euc '
+              export PATH="/opt/shims:${PATH}"
+              mkdir -p /run/systemd/system /etc/systemd/system
+              sh /opt/install.sh "${TAG}"
+              /usr/local/bin/solix-mqtt-bridge -version | grep -F "solix-mqtt-bridge ${TAG#v} "
+            '

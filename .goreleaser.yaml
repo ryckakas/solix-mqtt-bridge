@@ -33,6 +33,8 @@ archives:
 
 checksum:
   name_template: "solix-mqtt-bridge_{{ .Version }}_checksums.txt"
+  extra_files:
+    - glob: ./scripts/install.sh
 
 sboms:
   - id: default
@@ -71,3 +73,5 @@ dockers_v2:
 release:
   draft: false
   prerelease: auto
+  extra_files:
+    - glob: ./scripts/install.sh
