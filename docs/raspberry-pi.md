@@ -54,8 +54,9 @@ Then install the bridge with **option A** (simplest) or **option B** (if the Pi 
    ```
 
    It picks the build for your Pi, checks it against the release's checksums, and installs the binary to
-   `/usr/local/bin`, the systemd service, and a configuration template at `/etc/solix-mqtt-bridge.env` that only root
-   can read. It doesn't start the bridge yet, and leaves no downloads behind. To install a specific release instead,
+   `/usr/local/bin`, the systemd service with its own system user `solix-mqtt-bridge`, and a configuration template
+   at `/etc/solix-mqtt-bridge.env` that only root can read. It adds you to the `solix-mqtt-bridge` group, so you can
+   read the log files once you log in again. It doesn't start the bridge yet, and leaves no downloads behind. To install a specific release instead,
    add its version: `... | sudo sh -s -- 0.2.3`. From another computer, run the same line through
    `ssh -t <user>@<pi-ip> '...'`.
 
@@ -92,7 +93,8 @@ Then install the bridge with **option A** (simplest) or **option B** (if the Pi 
    with Ctrl+C; the service keeps running.
 
 systemd starts the bridge at boot and restarts it 10 s after a crash. Invalid configuration stops it instead, with the
-problem shown in `systemctl status solix-mqtt-bridge`. It runs as an unprivileged, sandboxed user.
+problem shown in `systemctl status solix-mqtt-bridge`. It runs as the unprivileged, sandboxed system user
+`solix-mqtt-bridge`.
 
 <details>
 <summary>Reading the installer before running it</summary>
@@ -121,19 +123,24 @@ curl -fsSLO "https://github.com/ryckakas/solix-mqtt-bridge/releases/download/v${
 sha256sum --ignore-missing -c "solix-mqtt-bridge_${V}_checksums.txt"
 tar xzf "solix-mqtt-bridge_${V}_${ARCH}.tar.gz"
 sudo install -m 0755 solix-mqtt-bridge /usr/local/bin/solix-mqtt-bridge
+sudo useradd --system --user-group --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin solix-mqtt-bridge
+sudo usermod -aG solix-mqtt-bridge "$USER"
 sudo install -m 0644 deploy/examples/solix-mqtt-bridge.service /etc/systemd/system/
 sudo install -m 0600 deploy/examples/solix-mqtt-bridge.env /etc/solix-mqtt-bridge.env
 sudo systemctl daemon-reload
 ```
 
-The checksum line must print `OK`. Skip the `.env` line when updating, so your configuration stays. Then continue
-with step 2.
+The checksum line must print `OK`. When updating, skip the `.env` line so your configuration stays. The `useradd`
+and `usermod` lines are needed once; after that `useradd` only reports that the user exists. Then continue with
+step 2.
 
 </details>
 
 **Optional log files:** add `LOG_DIR=/var/log/solix-mqtt-bridge` to the configuration and restart the service. The
 bridge then writes one file per day there, including a line per poll, and deletes files older than a week
-(`LOG_RETENTION_DAYS`). `sudo ls /var/log/solix-mqtt-bridge` lists them.
+(`LOG_RETENTION_DAYS`). Members of the `solix-mqtt-bridge` group can list and open them without sudo, in any
+editor. The installer adds the user who ran it with sudo; log in again once for that to apply. To add someone else:
+`sudo usermod -aG solix-mqtt-bridge <user>`.
 
 ## Option B: Docker
 

@@ -198,6 +198,19 @@ jobs:
       - name: Lint shell scripts
         run: make shellcheck
 
+  unit-check:
+    name: systemd unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # In Debian, the base of Raspberry Pi OS, rather than with the runner's systemd.
+      - name: systemd-analyze verify and security
+        run: make unit-check
+
   typos:
     name: typos
     runs-on: ubuntu-latest

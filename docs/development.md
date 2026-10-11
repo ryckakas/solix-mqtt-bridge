@@ -1,7 +1,7 @@
 # Development
 
 ```sh
-make check        # every gate CI runs: lint, complexity, dead code, read-only, tidy, zizmor, actionlint, shellcheck, typos, tests, govulncheck
+make check        # every gate CI runs: lint, complexity, dead code, read-only, tidy, zizmor, actionlint, shellcheck, unit-check, typos, tests, govulncheck
 make integration  # tests including the Docker-based ones (mosquitto and the installer via testcontainers)
 make build        # ./bin/solix-mqtt-bridge for this machine
 make help         # all targets

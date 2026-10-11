@@ -67,13 +67,17 @@ func (w *Writer) open(day string) error {
 	if err := w.closeFile(); err != nil {
 		w.reports.Warn("closing the previous log file failed", "dir", w.dir, "err", err)
 	}
-	if err := os.MkdirAll(w.dir, 0o700); err != nil {
+	if err := os.MkdirAll(w.dir, 0o750); err != nil {
 		return err
 	}
 	path := filepath.Join(w.dir, namePrefix+day+nameSuffix)
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600) //nolint:gosec // the operator's LOG_DIR, a name of our own
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o640) //nolint:gosec // the operator's LOG_DIR, a name of our own
 	if err != nil {
 		return err
+	}
+	// Explicit, so neither the umask nor an older version's 0600 file keeps the service's group from reading it.
+	if err := f.Chmod(0o640); err != nil {
+		w.reports.Warn("making the log file group-readable failed", "path", path, "err", err)
 	}
 	w.file, w.day = f, day
 	if err := w.prune(day); err != nil {

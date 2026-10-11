@@ -66,6 +66,8 @@ openWB-built devices usually give owners no shell access; run the bridge on a se
 sudo systemctl disable --now solix-mqtt-bridge
 sudo rm /etc/systemd/system/solix-mqtt-bridge.service /usr/local/bin/solix-mqtt-bridge /etc/solix-mqtt-bridge.env
 sudo systemctl daemon-reload
+sudo userdel solix-mqtt-bridge
+sudo groupdel solix-mqtt-bridge  # only if it's still there: userdel keeps a group that still has members
 ```
 
 The bridge publishes 0 W on shutdown, so openWB stops counting the battery. Remove the MQTT battery component in
