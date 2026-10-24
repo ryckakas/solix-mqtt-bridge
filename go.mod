@@ -10,7 +10,7 @@ tool (
 )
 
 require (
-	github.com/eclipse/paho.mqtt.golang v1.5.1
+	github.com/eclipse/paho.mqtt.golang v1.5.2-0.20260929193317-99cc8c4b3b24
 	github.com/grid-x/modbus v1.5.1
 	github.com/simonvetter/modbus v1.6.4
 	github.com/testcontainers/testcontainers-go v0.44.0
