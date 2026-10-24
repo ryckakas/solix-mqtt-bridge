@@ -44,6 +44,7 @@ integration tests (Docker required), govulncheck and `go vet`.
 - **Tool availability is itself a gate.** `go version -m "$(command -v golangci-lint)"` must show a Go at least as
   new as go.mod's `go` line. A lint binary built by an older Go analyses nothing and still exits 0.
 - `go.mod`'s `toolchain` line is the single place to raise Go. The Makefile and the Dockerfile build arg read it.
+  Renovate (`renovate.json5`) proposes its bumps and touches nothing else.
 - CI pins every tool version exactly; new rules arrive with a deliberate bump. Dependabot moves gomod (including
   the bonsai-lint and deadcode `tool` lines), actions and the Dockerfile base image. These are bumped by hand:
   - the golangci-lint `version:` in `ci.yml`;

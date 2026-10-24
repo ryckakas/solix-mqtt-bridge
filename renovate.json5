@@ -1,0 +1,22 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  // Dependabot owns every other update; Renovate only fills its gap, the go.mod toolchain line.
+  enabledManagers: ["gomod"],
+  dependencyDashboard: false,
+  // Same cooldown as Dependabot: a week lets a compromised or yanked release surface first.
+  minimumReleaseAge: "7 days",
+  packageRules: [
+    {
+      matchManagers: ["gomod"],
+      enabled: false,
+    },
+    {
+      matchManagers: ["gomod"],
+      matchDepTypes: ["toolchain"],
+      enabled: true,
+      // Without it, a new Go minor would hide the security patches still due on the current one.
+      separateMinorPatch: true,
+      labels: ["dependencies"],
+    },
+  ],
+}
