@@ -131,12 +131,11 @@ jobs:
           jq -rs -f .github/govulncheck-report.jq "${RUNNER_TEMP}/govulncheck.json" \
             | tee "${RUNNER_TEMP}/govulncheck.md" >> "${GITHUB_STEP_SUMMARY}"
 
-      # Fork and Dependabot PRs get a read-only token, so they can't comment.
+      # Fork PRs always get a read-only token. Dependabot's is read-only too unless raised, which the job's permissions do.
       - name: Comment findings on the PR
         if: >-
           github.event_name == 'pull_request'
           && github.event.pull_request.head.repo.full_name == github.repository
-          && github.actor != 'dependabot[bot]'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
