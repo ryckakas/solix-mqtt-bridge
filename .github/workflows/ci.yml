@@ -146,6 +146,20 @@ jobs:
             ghcr.io/zizmorcore/zizmor:1.30.1@sha256:a2eb396d886c053073405c7a980f2139ba2248ec172243cfa3841e57196e8101 \
             --collect=all --strict-collection --format=github .
 
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # scan every commit, not just the tip
+          persist-credentials: false
+
+      # Image pinned by GITLEAKS_IMAGE in the Makefile.
+      - name: Scan git history for secrets
+        run: make gitleaks
+
   tidy:
     name: go mod tidy
     runs-on: ubuntu-latest

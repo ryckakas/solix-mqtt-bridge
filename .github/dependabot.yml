@@ -4,10 +4,11 @@ updates:
   - package-ecosystem: gomod
     directory: /
     schedule:
-      interval: monthly
+      interval: weekly
     # A week lets a compromised or yanked release surface first; security updates skip it.
     cooldown:
       default-days: 7
+    # Majors stay out of the group, so each arrives as its own PR and can't hold back the routine bumps.
     groups:
       go-dependencies:
         patterns:
@@ -19,13 +20,13 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: monthly
+      interval: weekly
     cooldown:
       default-days: 7
 
   - package-ecosystem: docker
     directory: /
     schedule:
-      interval: monthly
+      interval: weekly
     cooldown:
       default-days: 7

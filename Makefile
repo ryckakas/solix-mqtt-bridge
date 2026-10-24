@@ -13,13 +13,14 @@ LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.dat
 GOVULNCHECK_VERSION := v1.8.0
 ACTIONLINT_VERSION := v1.7.12
 GORELEASER_IMAGE := goreleaser/goreleaser:v2.18.2
+GITLEAKS_IMAGE := ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
 # systemd itself comes from Debian's archive for this release, so its exact version isn't pinned.
 UNIT_IMAGE := debian:trixie@sha256:913f6706df59a68922d1dd08f78c2476560a8d367897200a6005b00e5f67c2d5
 DEV_COMPOSE := docker compose -f deploy/dev/docker-compose.yml
 SESSION_COMPOSE := docker compose -f deploy/session/docker-compose.yml
 IMAGE ?= solix-mqtt-bridge:dev
 
-.PHONY: help fmt lint complexity deadcode readonly tidy-check zizmor actionlint shellcheck unit-check typos test race integration cover vuln build image dev-up dev-down dev-logs session-up session-down session-logs release-check check clean
+.PHONY: help fmt lint complexity deadcode readonly tidy-check zizmor gitleaks actionlint shellcheck unit-check typos test race integration cover vuln build image dev-up dev-down dev-logs session-up session-down session-logs release-check check clean
 
 help:
 	@echo "solix-mqtt-bridge make targets:"
@@ -30,6 +31,7 @@ help:
 	@echo "  readonly    - no Modbus write call outside internal/simulator"
 	@echo "  tidy-check  - go.mod/go.sum match what go mod tidy produces (changes nothing)"
 	@echo "  zizmor      - audit .github/ workflows and dependabot.yml (offline)"
+	@echo "  gitleaks    - scan the whole git history for committed secrets"
 	@echo "  actionlint  - lint .github/workflows with actionlint $(ACTIONLINT_VERSION) (needs shellcheck)"
 	@echo "  shellcheck  - lint the installer and its test stand-ins"
 	@echo "  unit-check  - systemd-analyze verify + security on the service file (Docker)"
@@ -86,6 +88,10 @@ tidy-check:
 zizmor:
 	$(call check_tool,zizmor,brew install zizmor or https://docs.zizmor.sh/installation/)
 	zizmor --offline --collect=all --strict-collection .
+
+# --redact keeps a finding's secret out of the public CI log.
+gitleaks:
+	docker run --rm -v "$(CURDIR):/repo:ro" $(GITLEAKS_IMAGE) git --redact --verbose /repo
 
 # actionlint silently skips its shell-script rules when shellcheck is missing, so require it.
 actionlint:
@@ -149,7 +155,7 @@ session-logs:
 release-check:
 	docker run --rm -v "$(CURDIR):/src" -w /src $(GORELEASER_IMAGE) check
 
-check: lint complexity deadcode readonly tidy-check zizmor actionlint shellcheck unit-check typos integration vuln
+check: lint complexity deadcode readonly tidy-check zizmor gitleaks actionlint shellcheck unit-check typos integration vuln
 	go vet ./...
 
 clean:
