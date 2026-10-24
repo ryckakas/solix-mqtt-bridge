@@ -35,7 +35,7 @@ MQTT. A generic core (reader, plausibility filters, fresh/stale state) feeds ind
 
 Run `make check` before considering a change done; green there should mean green in CI. It runs golangci-lint,
 bonsai-lint, deadcode, the read-only grep gate (`make readonly`), the go mod tidy drift check (`make tidy-check`),
-zizmor (offline), actionlint (with shellcheck), shellcheck on `scripts/` (the installer and its test stand-ins),
+zizmor (offline), gitleaks over the whole git history, actionlint (with shellcheck), shellcheck on `scripts/` (the installer and its test stand-ins),
 `systemd-analyze verify` and `security` on the service file (`make unit-check`, in Debian), typos, race +
 integration tests (Docker required), govulncheck and `go vet`.
 
@@ -48,6 +48,7 @@ integration tests (Docker required), govulncheck and `go vet`.
   the bonsai-lint and deadcode `tool` lines), actions and the Dockerfile base image. These are bumped by hand:
   - the golangci-lint `version:` in `ci.yml`;
   - the zizmor image digest;
+  - the gitleaks image tag and digest (Makefile `GITLEAKS_IMAGE`);
   - the govulncheck version (Makefile + `ci.yml`);
   - the actionlint version (Makefile `ACTIONLINT_VERSION`);
   - the ShellCheck version and its SHA-256 (`ci.yml`, actionlint job);
