@@ -2,7 +2,7 @@ module github.com/ryckakas/solix-mqtt-bridge
 
 go 1.27.0
 
-toolchain go1.27.2
+toolchain go1.27.3
 
 tool (
 	bonsai.kauneckas.dev/bonsai-lint
